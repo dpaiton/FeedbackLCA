@@ -362,6 +362,7 @@ class Model(object):
   """Write graph structure to protobuf file"""
   def write_graph(self, graph_def):
     write_name = self.model_name+"_v"+self.version+".pb"
+    self.writer = tf.train.SummaryWriter(self.save_dir, graph=self.graph)
     tf.train.write_graph(graph_def,
       logdir=self.save_dir, name=write_name, as_text=False)
     logging.info("Graph def saved in file %s"%self.save_dir+write_name)
@@ -455,7 +456,7 @@ class Model(object):
     logging.info("\tsupervised loss:\t%g"%(
       self.supervised_loss.eval(feed_dict)))
     logging.info("\tmax val of a:\t\t%g"%(a_vals.max()))
-    logging.info("\tpercent active:\t\t%g%%"%(
+    logging.info("\tpercent active:\t\t%0.2f%%"%(
       100.0 * np.count_nonzero(a_vals)
       / float(self.num_neurons * self.batch_size)))
     logging.info("\trecon pSNR dB:\t\t%g"%(self.pSNRdB.eval(feed_dict)))
@@ -772,7 +773,8 @@ class LCAF(Model):
           self.u_zeros = tf.zeros(
             shape=tf.pack([self.num_neurons, tf.shape(self.s)[1]]),
             dtype=tf.float32, name="u_zeros")
-          self.label_mult = tf.reduce_sum(self.y, reduction_indices=[0])
+          self.label_mult = tf.reduce_sum(self.y, reduction_indices=[0],
+            name="label_multiplier")
 
         with tf.name_scope("step_counter") as scope:
           self.global_step = tf.Variable(0, trainable=False, name="global_step")
@@ -818,7 +820,8 @@ class LCAF(Model):
           with tf.name_scope("image_estimate"):
             self.s_ = tf.matmul(self.phi, self.a, name="reconstruction")
           with tf.name_scope("label_estimate"):
-            self.y_ = tf.transpose(tf.nn.softmax(tf.transpose(self.c)))
+            self.y_ = tf.clip_by_value(tf.transpose(tf.nn.softmax(
+              tf.transpose(self.c))), self.eps, 1.0)
 
         with tf.name_scope("loss") as scope:
           with tf.name_scope("unsupervised"):
@@ -827,20 +830,22 @@ class LCAF(Model):
               reduction_indices=[0]))
             self.sparse_loss = self.sparse_mult * tf.reduce_mean(
               tf.reduce_sum(tf.abs(self.a), reduction_indices=[0]))
-            self.entropy_loss = self.ent_mult * tf.reduce_mean(
-              -tf.reduce_sum(tf.mul(tf.clip_by_value(self.y_, self.eps, 1.0),
-              tf.log(tf.clip_by_value(self.y_, self.eps, 1.0))),
-              reduction_indices=[0]))
+            self.entropy_loss = -tf.reduce_sum(tf.mul(self.y_,
+              tf.log(self.y_)), reduction_indices=[0])
+            self.mean_entropy_loss = (self.ent_mult * tf.reduce_mean(
+              self.entropy_loss, name="mean_entropy_loss"))
             self.unsupervised_loss = (self.euclidean_loss + self.sparse_loss)
 
           with tf.name_scope("supervised"):
             with tf.name_scope("cross_entropy_loss"):
+              self.cross_entropy_loss = (self.label_mult
+                * -tf.reduce_sum(tf.mul(self.y, tf.log(self.y_)),
+                reduction_indices=[0]))
               label_count = tf.reduce_sum(self.label_mult)
-              self.cross_entropy_loss = self.sup_mult * (
-                tf.reduce_sum(self.label_mult * -tf.reduce_sum(tf.mul(self.y,
-                tf.log(tf.clip_by_value(self.y_, self.eps, 1.0))),
-                reduction_indices=[0])) / label_count)
-            self.supervised_loss = self.cross_entropy_loss
+              self.mean_cross_entropy_loss = (self.sup_mult
+                * tf.reduce_sum(self.cross_entropy_loss) /
+                (label_count + self.eps))
+            self.supervised_loss = self.mean_cross_entropy_loss
           self.total_loss = self.unsupervised_loss + self.supervised_loss
 
         with tf.name_scope("update_u") as scope:
@@ -854,15 +859,16 @@ class LCAF(Model):
             name="explaining_away")
 
           if self.auto_diff_u:
-            self.fb = (self.fb_mult 
-              * tf.gradients(self.cross_entropy_loss, self.a)[0]
-              + self.ent_mult * self.fb_mult
+            self.fb = self.fb_mult * (
+              self.sup_mult * tf.gradients(self.cross_entropy_loss, self.a)[0]
+              + (1-self.label_mult) * self.ent_mult
               * tf.gradients(self.entropy_loss, self.a)[0])
           else:
             self.fb = (self.sup_mult * self.fb_mult * self.label_mult
             * tf.matmul(tf.transpose(self.w), tf.sub(self.y_, self.y)))
 
           self.du = (self.lca_b - self.lca_explain_away - self.u - self.fb)
+
           self.step_lca = tf.group(self.u.assign_add(self.eta * self.du),
             name="do_update_u")
           self.clear_u = tf.group(self.u.assign(self.u_zeros),
