@@ -37,8 +37,8 @@ class MNIST:
     if tot_imgs < num_val:
       num_val = tot_imgs
     if num_val > 0:
-      self.val_indices = random.sample(np.arange(tot_imgs, dtype=np.int32),
-        num_val)
+      self.val_indices = np.random.choice(np.arange(tot_imgs, dtype=np.int32),
+        size=num_val, replace=False)
       self.img_indices = np.setdiff1d(np.arange(tot_imgs, dtype=np.int32),
         self.val_indices).astype(np.int32)
     else:
@@ -56,8 +56,9 @@ class MNIST:
           for idx
           in np.arange(len(self.img_indices), dtype=np.int32)
           if self.labels[self.img_indices[idx]] == lbl]
-        self.ignore_indices += random.sample(lbl_loc,
-          int(len(lbl_loc) - (self.num_keep/float(self.num_classes))))
+        self.ignore_indices += np.random.choice(lbl_loc, 
+          size=int(len(lbl_loc) - (self.num_keep/float(self.num_classes))),
+          replace=False)
     else:
       self.ignore_indices = None
 
