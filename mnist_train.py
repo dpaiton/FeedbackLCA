@@ -1,4 +1,4 @@
-## Copyright 2015 Yahoo Inc.
+## Copyright 2016 Yahoo Inc.
 ## Licensed under the terms of the New-BSD license. Please see LICENSE file in the project root for terms.
 import matplotlib
 matplotlib.use("Agg")
@@ -13,13 +13,14 @@ import tensorflow as tf
 
 model_params = {
   "model_type": "LCAF",
-  "model_name": "nofb_sup_nopre",
+  "model_name": "test",
   "output_dir": os.path.expanduser("~")+"/Work/Projects/",
   "data_dir": os.path.expanduser("~")+"/Work/Datasets/MNIST/",
   "base_version": "0",
   "optimizer": "annealed_sgd",
   "auto_diff_u": True,
   "rectify_a": True,
+  "norm_images": False,
   "norm_a": False,
   "norm_weights": True,
   "one_hot_labels": True,
@@ -30,7 +31,7 @@ model_params = {
   "num_val": 10000,
   "dt": 0.001,
   "tau": 0.01,
-  "cp_int": 1000,
+  "cp_int": 100,
   "val_on_cp": True,
   "cp_load": False,
   "cp_load_name": "test",
@@ -52,10 +53,10 @@ model_schedule = [
   "base_sup_mult": 0.5,
   "fb_mult": 0.0,
   "num_steps": 20,
-  "weight_lr": [0.2,]*3,
-  "decay_steps": [10000,]*3,
-  "decay_rate": [0.5,]*3,
-  "staircase": [True,]*3,
+  "weight_lr": [0.2]*3,
+  "decay_steps": [10000]*3,
+  "decay_rate": [0.5]*3,
+  "staircase": [True]*3,
   "num_batches": 20000}]#,
 
   #{"weights": ["phi", "w", "bias"],
@@ -94,7 +95,7 @@ for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
   data = load_MNIST(model_params["data_dir"],
     num_val=model_params["num_val"],
     fraction_labels=frac_keep,
-    normalize_imgs=True,
+    normalize_imgs=model_params["norm_images"],
     one_hot=model_params["one_hot_labels"],
     rand_seed=model_params["rand_seed"])
   num_train_labels = int(data["train"].num_examples * frac_keep)
