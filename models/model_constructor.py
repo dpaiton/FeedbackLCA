@@ -1,5 +1,6 @@
-## Copyright 2015 Yahoo Inc.
-## Licensed under the terms of the New-BSD license. Please see LICENSE file in the project root for terms.
+## Copyright 2016 Yahoo Inc.
+## Licensed under the terms of the New-BSD license.
+## Please see LICENSE file in the project root for terms.
 import os
 import logging
 import numpy as np
@@ -489,19 +490,20 @@ class Model(object):
       pf.save_data_tiled(
         tf.transpose(self.s_).eval(feed_dict).reshape(
         self.batch_size, int(np.sqrt(self.num_pixels)),
-        int(np.sqrt(self.num_pixels))), title=("Reconstructions at step "
-        +current_step), save_filename=(self.disp_dir+"recon_v"+self.version
-        +"-"+current_step.zfill(5)+".pdf"))
+        int(np.sqrt(self.num_pixels))), normalize=False,
+        title=("Reconstructions at step "+current_step),
+        save_filename=(self.disp_dir+"recon_v"+self.version+"-"
+        +current_step.zfill(5)+".pdf"))
       pf.save_data_tiled(
         self.w.eval().reshape(self.num_classes,
         int(np.sqrt(self.num_neurons)), int(np.sqrt(self.num_neurons))),
-        title="Classification matrix at step number "+current_step,
-        save_filename=(self.disp_dir+"w_v"
-        +self.version+"-"+current_step.zfill(5)+".pdf"))
+        normalize=True, title="Classification matrix at step number "
+        +current_step, save_filename=(self.disp_dir+"w_v"+self.version+"-"
+        +current_step.zfill(5)+".pdf"))
       pf.save_data_tiled(
         tf.transpose(self.phi).eval().reshape(self.num_neurons,
         int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
-        title="Dictionary at step "+current_step,
+        normalize=True, title="Dictionary at step "+current_step,
         save_filename=(self.disp_dir+"phi_v"+self.version+"-"
         +current_step.zfill(5)+".pdf"))
       for weight_grad_var in self.grads_and_vars[self.sched_idx]:
@@ -511,13 +513,13 @@ class Model(object):
         if name == "phi":
           pf.save_data_tiled(grad.T.reshape(self.num_neurons,
             int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
-            title="Gradient for phi at step "+current_step,
+            normalize=True, title="Gradient for phi at step "+current_step,
             save_filename=(self.disp_dir+"dphi_v"+self.version+"_"
             +current_step.zfill(5)+".pdf"))
         elif name == "w":
           pf.save_data_tiled(grad.reshape(self.num_classes,
             int(np.sqrt(self.num_neurons)), int(np.sqrt(self.num_neurons))),
-            title="Gradient for w at step "+current_step,
+            normalize=True, title="Gradient for w at step "+current_step,
             save_filename=(self.disp_dir+"dw_v"+self.version+"_"
             +current_step.zfill(5)+".pdf"))
 
@@ -696,27 +698,34 @@ class DRSAE(Model):
       pf.save_data_tiled(
         tf.transpose(self.s_).eval(feed_dict).reshape(
         self.batch_size, int(np.sqrt(self.num_pixels)),
-        int(np.sqrt(self.num_pixels))), title=("Reconstructions at step "
-        +current_step), save_filename=(self.disp_dir+"recon_v"+self.version
-        +"-"+current_step.zfill(5)+".pdf"))
+        int(np.sqrt(self.num_pixels))), normalize=False,
+        title=("Reconstructions at step "+current_step),
+        save_filename=(self.disp_dir+"recon_v"+self.version+"-"
+        +current_step.zfill(5)+".pdf"))
       pf.save_data_tiled(
         self.w.eval().reshape(self.num_classes,
         int(np.sqrt(self.num_neurons)), int(np.sqrt(self.num_neurons))),
-        title="Classification matrix at step number "+current_step,
-        save_filename=(self.disp_dir+"w_v"
-        +self.version+"-"+current_step.zfill(5)+".pdf"))
+        normalize=True, title="Classification matrix at step number "
+        +current_step, save_filename=(self.disp_dir+"w_v"+self.version+"-"
+        +current_step.zfill(5)+".pdf"))
       pf.save_data_tiled(
         self.e.eval().reshape(self.num_neurons,
         int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
-        title="Encoding dictionary at step "+current_step)
+        normalize=True, title="Encoding dictionary at step "+current_step,
+        save_filename=(self.disp_dir+"e_v"+self.version+"-"
+        +current_step.zfill(5)+".pdf")
       pf.save_data_tiled(
         tf.transpose(self.d).eval().reshape(self.num_neurons,
         int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
-        title="Decoding dictionary at step "+current_step)
+        normalize=True, title="Decoding dictionary at step "+current_step,
+        save_filename=(self.disp_dir+"d_v"+self.version+"-"
+        +current_step.zfill(5)+".pdf")
       pf.save_data_tiled(
         self.g.eval().reshape(self.num_neurons*self.num_neurons,
         int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
-        title="Explaining Away dictionary at step "+current_step)
+        normalize=True, title="Explaining Away dictionary at step "
+        +current_step, save_filename=(self.disp_dir+"g_v"+self.version+"-"
+        +current_step.zfill(5)+".pdf")
       for weight_grad_var in self.grads_and_vars[self.sched_idx]:
         grad = weight_grad_var[0][0].eval(feed_dict)
         shape = grad.shape
