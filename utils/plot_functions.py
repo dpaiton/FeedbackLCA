@@ -99,40 +99,36 @@ def save_inference_traces(data, base_filename, file_ext):
     data["ga"][img_idx,...], data["a"][img_idx,...]])
   fig, sub_axes = plt.subplots(int(np.sqrt(num_neurons)+1),
     int(np.sqrt(num_neurons)))
-  neuron_idx = 0
-  for plot_row in range(int(np.sqrt(num_neurons))):
-    for plot_col in range(int(np.sqrt(num_neurons))):
+  for (axis_idx, axis) in enumerate(fig.axes):
+    if axis_idx < num_neurons:
       t = np.arange(data["b"].shape[1])
-      b = data["b"][img_idx,:,neuron_idx]
-      u = data["u"][img_idx,:,neuron_idx]
-      ga = data["ga"][img_idx,:,neuron_idx]
-      fb = data["fb"][img_idx,:,neuron_idx]
-      a = data["a"][img_idx,:,neuron_idx]
-      sub_axes[plot_row, plot_col].plot(t, b, linewidth=0.25, color="g", label="b")
-      sub_axes[plot_row, plot_col].plot(t, u, linewidth=0.25, color="b", label="u")
-      sub_axes[plot_row, plot_col].plot(t, ga, linewidth=0.25, color="r",
-        label="Ga")
-      sub_axes[plot_row, plot_col].plot(t, fb, linewidth=0.25, color="y",
-        label="fb")
-      sub_axes[plot_row, plot_col].plot(t, [0 for _ in t], linewidth=0.25,
+      b = data["b"][img_idx,:,axis_ix]
+      u = data["u"][img_idx,:,axis_ix]
+      ga = data["ga"][img_idx,:,axis_ix]
+      fb = data["fb"][img_idx,:,axis_ix]
+      a = data["a"][img_idx,:,axis_ix]
+      axis.plot(t, b, linewidth=0.25, color="g", label="b")
+      axis.plot(t, u, linewidth=0.25, color="b", label="u")
+      axis.plot(t, ga, linewidth=0.25, color="r", label="Ga")
+      axis.plot(t, fb, linewidth=0.25, color="y", label="fb")
+      axis.plot(t, [0 for _ in t], linewidth=0.25,
         color="k", linestyle="-", label="zero")
-      #sub_axes[plot_row, plot_col].set_ylim((min_val, max_val))
-      #sub_axes[plot_row, plot_col].set_aspect(1.0001)
-      sub_axes[plot_row, plot_col].tick_params(
-        axis="both",
-        which="both",
-        bottom="off",
-        top="off",
-        left="off",
-        right="off",
-        labelbottom="off",
-        labeltop="off",
-        labelleft="off",
-        labelright="off")
-      if a.any() > 0:
-        for spine in sub_axes[plot_row, plot_col].spines.values():
-          spine.set_edgecolor('magenta')
-      neuron_idx += 1
+    #axis.set_ylim((min_val, max_val))
+    #axis.set_aspect(1.0001)
+    axis.tick_params(
+      axis="both",
+      which="both",
+      bottom="off",
+      top="off",
+      left="off",
+      right="off",
+      labelbottom="off",
+      labeltop="off",
+      labelleft="off",
+      labelright="off")
+    if a.any() > 0:
+      for spine in axis.spines.values():
+        spine.set_edgecolor('magenta')
   num_pixels = np.size(data["images"][img_idx])
   image = data["images"][img_idx,...].reshape(int(np.sqrt(num_pixels)),
     int(np.sqrt(num_pixels)))
@@ -155,7 +151,7 @@ def save_inference_traces(data, base_filename, file_ext):
       labelright="off")
   #sub_axes[0, 19].legend(bbox_to_anchor=(1.1, 1.0), ncol=1, fancybox=True)
 
-  #sub_axes[0].set_xlabel("Time Step (dt = 1 msec)") 
+  #sub_axes[0].set_xlabel("Time Step (dt = 1 msec)")
   #sub_axes[2].set_ylabel("LCA Input Traces")
   #sub_axes[2].yaxis.set_label_coords(ylabel_xpos, 0.5)
   fig.suptitle("LCA Activity", y=0.99, x=0.5)
@@ -176,14 +172,14 @@ Args:
 """
 def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   ## Loss over time
-  fig, sub_axes = plt.subplots(3)
+  fig, sub_axes = plt.subplots(2,3)
   unsup_loss = data["unsup_loss"]
   (nimgs, nsteps) = unsup_loss.shape
   t = np.arange(nsteps)
   unsup_loss_mean = np.mean(unsup_loss, axis=0)
   unsup_loss_sem = np.std(unsup_loss, axis=0) / np.sqrt(nimgs)
-  sub_axes[0].plot(t, unsup_loss_mean, "k-")
-  sub_axes[0].fill_between(t, unsup_loss_mean-unsup_loss_sem,
+  sub_axes[0,0].plot(t, unsup_loss_mean, "k-")
+  sub_axes[0,0].fill_between(t, unsup_loss_mean-unsup_loss_sem,
     unsup_loss_mean+unsup_loss_sem, alpha=0.5)
 
   euc_loss = data["euc_loss"]
@@ -191,8 +187,26 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   t = np.arange(nsteps)
   euc_mean = np.mean(euc_loss, axis=0)
   euc_sem = np.std(euc_loss, axis=0) / np.sqrt(nimgs)
-  sub_axes[1].plot(t, euc_mean, "k-")
-  sub_axes[1].fill_between(t, euc_mean-euc_sem,
+  sub_axes[0,1].plot(t, euc_mean, "k-")
+  sub_axes[0,1].fill_between(t, euc_mean-euc_sem,
+    euc_mean+euc_sem, alpha=0.5)
+
+  sparse_loss = data["sparse_loss"]
+  (nimgs, nsteps) = euc_loss.shape
+  t = np.arange(nsteps)
+  euc_mean = np.mean(euc_loss, axis=0)
+  euc_sem = np.std(euc_loss, axis=0) / np.sqrt(nimgs)
+  sub_axes[0,2].plot(t, euc_mean, "k-")
+  sub_axes[0,2].fill_between(t, euc_mean-euc_sem,
+    euc_mean+euc_sem, alpha=0.5)
+
+  xent_loss = data["xent_loss"]
+  (nimgs, nsteps) = euc_loss.shape
+  t = np.arange(nsteps)
+  euc_mean = np.mean(euc_loss, axis=0)
+  euc_sem = np.std(euc_loss, axis=0) / np.sqrt(nimgs)
+  sub_axes[1,0].plot(t, euc_mean, "k-")
+  sub_axes[1,0].fill_between(t, euc_mean-euc_sem,
     euc_mean+euc_sem, alpha=0.5)
 
   psnr = data["psnr"]
@@ -200,22 +214,30 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   t = np.arange(nsteps)
   psnr_mean = np.mean(psnr, axis=0)
   psnr_sem = np.std(psnr, axis=0) / np.sqrt(nimgs)
-  sub_axes[2].plot(t, psnr_mean, "k-")
-  sub_axes[2].fill_between(t, psnr_mean-psnr_sem,
+  sub_axes[1,1].plot(t, psnr_mean, "k-")
+  sub_axes[1,1].fill_between(t, psnr_mean-psnr_sem,
     psnr_mean+psnr_sem, alpha=0.5)
 
-  sub_axes[0].get_xaxis().set_ticklabels([])
-  sub_axes[1].get_xaxis().set_ticklabels([])
-  sub_axes[2].set_xlabel("Time Step (dt = 1 msec)")
+  sub_axes[0,0].get_xaxis().set_ticklabels([])
+  sub_axes[0,1].get_xaxis().set_ticklabels([])
+  sub_axes[0,2].set_xlabel("Time Step (dt = 1 msec)")
+  sub_axes[1,0].get_xaxis().set_ticklabels([])
+  sub_axes[1,1].set_xlabel("Time Step (dt = 1 msec)")
+  sub_axes[1,2].get_xaxis().set_ticklabels([])
 
-  sub_axes[0].set_ylabel("Unsupervised Loss")
-  sub_axes[1].set_ylabel("Euclidean Loss")
-  sub_axes[2].set_ylabel("Recon pSNR dB")
+  sub_axes[0,0].set_ylabel("Unsupervised Loss")
+  sub_axes[0,1].set_ylabel("Euclidean Loss")
+  sub_axes[0,2].set_ylabel("Sparse Loss")
+  sub_axes[1,0].set_ylabel("Cross Entropy Loss")
+  sub_axes[1,1].set_ylabel("Recon pSNR dB")
+  sub_axes[1,2].get_yaxis().set_ticklabels([])
 
   ylabel_xpos = -0.1
-  sub_axes[0].yaxis.set_label_coords(ylabel_xpos, 0.5)
-  sub_axes[1].yaxis.set_label_coords(ylabel_xpos, 0.5)
-  sub_axes[2].yaxis.set_label_coords(ylabel_xpos, 0.5)
+  sub_axes[0,0].yaxis.set_label_coords(ylabel_xpos, 0.5)
+  sub_axes[0,1].yaxis.set_label_coords(ylabel_xpos, 0.5)
+  sub_axes[0,2].yaxis.set_label_coords(ylabel_xpos, 0.5)
+  sub_axes[1,0].yaxis.set_label_coords(ylabel_xpos, 0.5)
+  sub_axes[1,1].yaxis.set_label_coords(ylabel_xpos, 0.5)
   fig.suptitle("Average Statistics During Inference", y=1.0, x=0.5)
   out_filename = (base_filename+"_inference_stats"+file_ext)
   fig.savefig(out_filename, transparent=True)
