@@ -50,7 +50,11 @@ def compute_inference(args, data):
   psnr = np.zeros((args["num_inference_images"], args["num_inference_steps"]))
   euc_loss = np.zeros((args["num_inference_images"],
     args["num_inference_steps"]))
+  sparse_loss = np.zeros((args["num_inference_images"],
+    args["num_inference_steps"]))
   unsup_loss = np.zeros((args["num_inference_images"],
+    args["num_inference_steps"]))
+  xent_loss = np.zeros((args["num_inference_images"],
     args["num_inference_steps"]))
   recon = np.zeros((args["num_inference_images"],
     args["num_inference_steps"], args["model_params"]["num_pixels"]))
@@ -76,13 +80,17 @@ def compute_inference(args, data):
         psnr[img_idx, step] = np.squeeze(tmp_sess.run(model.pSNRdB, feed_dict))
         euc_loss[img_idx, step] = np.squeeze(tmp_sess.run(model.euclidean_loss,
           feed_dict))
+        sparse_loss[img_idx, step] = np.squeeze(tmp_sess.run(model.sparse_loss,
+          feed_dict))
         unsup_loss[img_idx, step] = np.squeeze(tmp_sess.run(
           model.unsupervised_loss, feed_dict))
+        xent_loss[img_idx, step] = np.squeeze(tmp_sess.run(
+          model.mean_cross_entropy_loss, feed_dict))
         recon[img_idx, step, :] = np.squeeze(tmp_sess.run(model.s_, feed_dict))
         tmp_sess.run(model.step_lca, feed_dict)
     return {"b":b, "ga":ga, "fb":fb, "u":u, "a":a, "psnr":psnr, "recon":recon,
-      "euc_loss":euc_loss, "unsup_loss":unsup_loss,
-      "images":np.hstack(images).T}
+      "sparse_loss":sparse_loss, "euc_loss":euc_loss, "unsup_loss":unsup_loss,
+      "xent_loss":xent_loss, "images":np.hstack(images).T}
 
 """
 Evaluate model and return activations & weights
@@ -186,7 +194,7 @@ def compute_performance(args, data):
       else:
         accuracy[run_idx] = 0
       if hasattr(model, "cross_entropy_loss"):
-        cross_entropy[run_idx] = tmp_sess.run(model.cross_entropy_loss,
+        cross_entropy[run_idx] = tmp_sess.run(model.mean_cross_entropy_loss,
           feed_dict)
       else:
         cross_entropy[run_idx] = 0
