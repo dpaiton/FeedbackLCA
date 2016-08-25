@@ -56,9 +56,9 @@ class MNIST:
           for idx
           in np.arange(len(self.img_indices), dtype=np.int32)
           if self.labels[self.img_indices[idx]] == lbl]
-        self.ignore_indices += np.random.choice(lbl_loc, 
+        np.append(self.ignore_indices, np.random.choice(lbl_loc, 
           size=int(len(lbl_loc) - (self.num_keep/float(self.num_classes))),
-          replace=False)
+          replace=False))
     else:
       self.ignore_indices = None
 
