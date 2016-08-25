@@ -110,6 +110,7 @@ class dataset:
         num_rows*num_cols))
     else:
       self.images = imgs.reshape(num_ex, num_rows*num_cols)
+      self.images /= 255.0
     self.labels = lbls
     self.ignore_labels = ignore_lbls
     self.num_examples = num_ex
