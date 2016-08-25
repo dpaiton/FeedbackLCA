@@ -713,19 +713,19 @@ class DRSAE(Model):
         int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
         normalize=True, title="Encoding dictionary at step "+current_step,
         save_filename=(self.disp_dir+"e_v"+self.version+"-"
-        +current_step.zfill(5)+".pdf")
+        +current_step.zfill(5)+".pdf"))
       pf.save_data_tiled(
         tf.transpose(self.d).eval().reshape(self.num_neurons,
         int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
         normalize=True, title="Decoding dictionary at step "+current_step,
         save_filename=(self.disp_dir+"d_v"+self.version+"-"
-        +current_step.zfill(5)+".pdf")
+        +current_step.zfill(5)+".pdf"))
       pf.save_data_tiled(
         self.g.eval().reshape(self.num_neurons*self.num_neurons,
         int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
         normalize=True, title="Explaining Away dictionary at step "
         +current_step, save_filename=(self.disp_dir+"g_v"+self.version+"-"
-        +current_step.zfill(5)+".pdf")
+        +current_step.zfill(5)+".pdf"))
       for weight_grad_var in self.grads_and_vars[self.sched_idx]:
         grad = weight_grad_var[0][0].eval(feed_dict)
         shape = grad.shape

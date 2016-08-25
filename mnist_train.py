@@ -18,7 +18,7 @@ model_params = {
   "data_dir": os.path.expanduser("~")+"/Work/Datasets/MNIST/",
   "base_version": "0",
   "optimizer": "annealed_sgd",
-  "auto_diff_u": True,
+  "auto_diff_u": False,
   "rectify_a": True,
   "norm_images": False,
   "norm_a": False,
@@ -31,7 +31,7 @@ model_params = {
   "num_val": 10000,
   "dt": 0.001,
   "tau": 0.01,
-  "cp_int": 100,
+  "cp_int": 1000,
   "val_on_cp": True,
   "cp_load": False,
   "cp_load_name": "test",
@@ -48,16 +48,16 @@ model_params = {
 model_schedule = [
   {"weights": ["phi", "w", "bias"],
   "recon_mult": 1.0,
-  "sparse_mult": 0.5,
+  "sparse_mult": 0.2,
   "ent_mult": 0.0,
-  "base_sup_mult": 0.5,
+  "base_sup_mult": 0.1,
   "fb_mult": 0.0,
   "num_steps": 20,
-  "weight_lr": [0.2]*3,
+  "weight_lr": [0.01]*3,
   "decay_steps": [10000]*3,
   "decay_rate": [0.5]*3,
   "staircase": [True]*3,
-  "num_batches": 20000}]#,
+  "num_batches": 30000}]#,
 
   #{"weights": ["phi", "w", "bias"],
   #"recon_mult": 1.0,
@@ -85,8 +85,8 @@ model_schedule = [
   #"staircase": [True,]*6,
   #"num_batches": 10000}]#, {}]
 
-frac_keep_labels = [1.0, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02, 0.01, 0.004,
-  0.001, 0.0004, 0.0002]
+frac_keep_labels = [0.02]#, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02, 0.01, 0.004,
+  #0.001, 0.0004, 0.0002]
 
 for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
   model_params["version"] = model_params["base_version"]+"."+str(frac_keep_idx)
