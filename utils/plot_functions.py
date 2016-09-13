@@ -102,11 +102,11 @@ def save_inference_traces(data, base_filename, file_ext):
   for (axis_idx, axis) in enumerate(fig.axes):
     if axis_idx < num_neurons:
       t = np.arange(data["b"].shape[1])
-      b = data["b"][img_idx,:,axis_ix]
-      u = data["u"][img_idx,:,axis_ix]
-      ga = data["ga"][img_idx,:,axis_ix]
-      fb = data["fb"][img_idx,:,axis_ix]
-      a = data["a"][img_idx,:,axis_ix]
+      b = data["b"][img_idx,:,axis_idx]
+      u = data["u"][img_idx,:,axis_idx]
+      ga = data["ga"][img_idx,:,axis_idx]
+      fb = data["fb"][img_idx,:,axis_idx]
+      a = data["a"][img_idx,:,axis_idx]
       axis.plot(t, b, linewidth=0.25, color="g", label="b")
       axis.plot(t, u, linewidth=0.25, color="b", label="u")
       axis.plot(t, ga, linewidth=0.25, color="r", label="Ga")
@@ -150,7 +150,6 @@ def save_inference_traces(data, base_filename, file_ext):
       labelleft="off",
       labelright="off")
   #sub_axes[0, 19].legend(bbox_to_anchor=(1.1, 1.0), ncol=1, fancybox=True)
-
   #sub_axes[0].set_xlabel("Time Step (dt = 1 msec)")
   #sub_axes[2].set_ylabel("LCA Input Traces")
   #sub_axes[2].yaxis.set_label_coords(ylabel_xpos, 0.5)
