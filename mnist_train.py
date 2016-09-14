@@ -1,5 +1,6 @@
 ## Copyright 2016 Yahoo Inc.
-## Licensed under the terms of the New-BSD license. Please see LICENSE file in the project root for terms.
+## Licensed under the terms of the New-BSD license.
+## Please see LICENSE file in the project root for terms.
 import matplotlib
 matplotlib.use("Agg")
 
@@ -13,7 +14,7 @@ import tensorflow as tf
 
 model_params = {
   "model_type": "LCAF",
-  "model_name": "test",
+  "model_name": "pretrain",
   "output_dir": os.path.expanduser("~")+"/Work/Projects/",
   "data_dir": os.path.expanduser("~")+"/Work/Datasets/MNIST/",
   "base_version": "0",
@@ -31,14 +32,15 @@ model_params = {
   "num_val": 10000,
   "dt": 0.001,
   "tau": 0.01,
-  "cp_int": 1000,
-  "val_on_cp": True,
+  "cp_int": 500,
+  "val_on_cp": False,
   "cp_load": False,
-  "cp_load_name": "test",
-  "cp_load_val": 100,
-  "cp_load_ver": "0.0",
+  "cp_load_name": "pretrain",
+  "cp_load_val": 30000,
+  "cp_load_ver": "1.0",
+  "cp_load_var": None,#["phi"],
   "stats_display": 10,
-  "generate_plots": 10000,
+  "generate_plots": 100,
   "display_plots": False,
   "save_plots": True,
   "eps": 1e-12,
@@ -48,7 +50,7 @@ model_params = {
 model_schedule = [
   {"weights": ["phi"],
   "recon_mult": 1.0,
-  "sparse_mult": 0.1,
+  "sparse_mult": 0.2,
   "ent_mult": 0.0,
   "base_sup_mult": 0.0,
   "fb_mult": 0.0,
@@ -59,7 +61,7 @@ model_schedule = [
   "staircase": [True],
   "num_batches": 30000}]#,
 
-  #{"weights": ["phi", "w", "bias"],
+  #{"weights": ["bias1", "bias2", "w"],
   #"recon_mult": 1.0,
   #"sparse_mult": 0.2,
   #"ent_mult": 0.0,
@@ -70,7 +72,7 @@ model_schedule = [
   #"decay_steps": [10000]*3,
   #"decay_rate": [0.5]*3,
   #"staircase": [True]*3,
-  #"num_batches": 30000}]#,
+  #"num_batches": 1000}]#,
 
   #{"weights": ["e", "d", "g", "w", "a_bias", "c_bias"],
   #"recon_mult": 1.0,
@@ -85,7 +87,7 @@ model_schedule = [
   #"staircase": [True,]*6,
   #"num_batches": 10000}]#, {}]
 
-frac_keep_labels = [0.02]#, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02, 0.01, 0.004,
+frac_keep_labels = [1.00]#, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02, 0.01, 0.004,
   #0.001, 0.0004, 0.0002]
 
 for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
@@ -132,7 +134,10 @@ for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
       checkpoint_file = (model.cp_load_dir+model_params["cp_load_name"]+"_v"
       +model_params["cp_load_ver"]+"_weights-"
       +str(model_params["cp_load_val"]))
-      model.weight_saver.restore(sess, checkpoint_file)
+      if model_params["cp_load_var"]:
+        model.loader.restore(sess, checkpoint_file)
+      else:
+        model.weight_saver.restore(sess, checkpoint_file)
       sess.run(model.global_step.assign(model_params["cp_load_val"]))
 
     for sch_idx, schedule in enumerate(model_schedule):

@@ -9,7 +9,8 @@ import tensorflow as tf
 
 """
 Modifiable Parameters:
-  model_type     [str] Type of model. Can be "Model", "LCAF" or "Feedforward"
+  model_type     [str] Type of model
+                       Can be "Model", "LCAF" or "DRSAE"
   model_name     [str] Name for model
   output_dir     [str] Base directory where output will be directed
   base_version   [str] Unmodified base version for output
@@ -32,6 +33,8 @@ Modifiable Parameters:
   cp_load_name   [str] checkpoint model name to load
   cp_load_val    [int] checkpoint time step to load
   cp_load_ver    [str] checkpoint version to load
+  cp_load_var    [list of str] which variables to load
+                       if None or empty list, the model load all weights
   stats_display  [int] How often to send updates to stdout
   generate_plots [int] How often to generate plots
   display_plots  [bool] If set, display plots
@@ -133,6 +136,10 @@ class Model(object):
     self.cp_load_name = str(params["cp_load_name"])
     self.cp_load_val = int(params["cp_load_val"])
     self.cp_load_ver = str(params["cp_load_ver"])
+    if params["cp_load_var"]:
+      self.cp_load_var = [str(var) for var in params["cp_load_var"]]
+    else:
+      self.cp_load_var = []
     # Directories
     self.out_dir = str(params["output_dir"]) + self.model_name
     self.cp_save_dir = self.out_dir + "/checkpoints/"
@@ -206,9 +213,12 @@ class Model(object):
           self.w = tf.get_variable(name="w", dtype=tf.float32,
             initializer=tf.truncated_normal(self.w_shape, mean=0.0,
             stddev=1.0, dtype=tf.float32, name="w_init"), trainable=True)
-          self.b = tf.get_variable(name="bias", dtype=tf.float32,
+          self.bias1 = tf.get_variable(name="bias1", dtype=tf.float32,
+            initializer=tf.zeros([self.num_neurons, 1], dtype=tf.float32,
+            name="bias1_init"), trainable=True)
+          self.bias2 = tf.get_variable(name="bias2", dtype=tf.float32,
             initializer=tf.zeros([self.num_classes, 1], dtype=tf.float32,
-            name="bias_init"), trainable=True)
+            name="bias2_init"), trainable=True)
 
         with tf.name_scope("normalize_weights") as scope:
           self.norm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi,
@@ -218,18 +228,19 @@ class Model(object):
 
         with tf.name_scope("hidden_variables") as scope:
           if self.rectify_a:
-            self.a = tf.nn.relu(tf.matmul(tf.transpose(self.phi), self.s),
-              name="activity")
+            self.a = tf.nn.relu(tf.add(tf.matmul(tf.transpose(self.phi),
+              self.s), self.bias1), name="activity")
           else:
-            self.a = tf.matmul(tf.transpose(self.phi), self.s, name="activity")
+            self.a = tf.add(tf.matmul(tf.transpose(self.phi), self.s),
+              self.bias1, name="activity")
 
           if self.norm_a:
             self.c = tf.add(tf.matmul(self.w, tf.nn.l2_normalize(self.a,
               dim=0, epsilon=self.eps, name="row_l2_norm"),
-              name="classify"), self.b, name="c")
+              name="classify"), self.bias2, name="c")
           else:
-            self.c = tf.add(tf.matmul(self.w, self.a, name="classify"), self.b,
-              name="c")
+            self.c = tf.add(tf.matmul(self.w, self.a, name="classify"),
+              self.bias2, name="c")
 
         with tf.name_scope("output") as scope:
           with tf.name_scope("image_estimate"):
@@ -252,12 +263,14 @@ class Model(object):
 
           with tf.name_scope("supervised"):
             with tf.name_scope("cross_entropy_loss"):
+              self.cross_entropy_loss = (self.label_mult
+                * -tf.reduce_sum(tf.mul(self.y, tf.log(tf.clip_by_value(
+                self.y_, self.eps, 1.0))), reduction_indices=[0]))
               label_count = tf.reduce_sum(self.label_mult)
-              self.cross_entropy_loss = self.sup_mult * (
-                tf.reduce_sum(self.label_mult * -tf.reduce_sum(tf.mul(self.y,
-                tf.log(tf.clip_by_value(self.y_, self.eps, 1.0))),
-                reduction_indices=[0])) / label_count)
-            self.supervised_loss = self.cross_entropy_loss
+              self.mean_cross_entropy_loss = (self.sup_mult
+                * tf.reduce_sum(self.cross_entropy_loss) /
+                (label_count + self.eps))
+            self.supervised_loss = self.mean_cross_entropy_loss
           self.total_loss = self.unsupervised_loss + self.supervised_loss
 
         with tf.name_scope("performance_metrics") as scope:
@@ -332,6 +345,16 @@ class Model(object):
         with tf.name_scope("initialization") as scope:
           self.init_op = tf.initialize_all_variables()
 
+  """Get variables for loading"""
+  def get_load_vars(self):
+    v = tf.all_variables()
+    if len(self.cp_load_var) > 0:
+      v = [var
+        for var in v
+        for weight in self.cp_load_var
+        if weight in var.name]
+    return v
+
   """Add savers to graph"""
   def construct_savers(self):
     assert self.graph_built, (
@@ -342,8 +365,10 @@ class Model(object):
       with tf.variable_scope("weights", reuse=True) as scope:
         weights = [weight for weight in tf.all_variables()
           if weight.name.startswith(scope.name)]
-      self.weight_saver = tf.train.Saver(weights)
+      self.weight_saver = tf.train.Saver(var_list=weights)
       self.full_saver = tf.train.Saver()
+      if self.cp_load and len(self.cp_load_var) > 0:
+        self.loader = tf.train.Saver(var_list=self.get_load_vars())
     self.savers_constructed = True
 
   """Write saver definitions for full model and weights-only"""
@@ -848,8 +873,8 @@ class LCAF(Model):
           with tf.name_scope("supervised"):
             with tf.name_scope("cross_entropy_loss"):
               self.cross_entropy_loss = (self.label_mult
-                * -tf.reduce_sum(tf.mul(self.y, tf.log(self.y_)),
-                reduction_indices=[0]))
+                * -tf.reduce_sum(tf.mul(self.y, tf.log(tf.clip_by_value(
+                self.y_, self.eps, 1.0))), reduction_indices=[0]))
               label_count = tf.reduce_sum(self.label_mult)
               self.mean_cross_entropy_loss = (self.sup_mult
                 * tf.reduce_sum(self.cross_entropy_loss) /

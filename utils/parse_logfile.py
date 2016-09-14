@@ -71,6 +71,9 @@ def read_params(log_text):
     [int(val) for val in re.findall("cp_load_val\s+(\d+)", log_text)])
   cp_load_ver = (
     [str(val) for val in re.findall("cp_load_ver\s+(\w+)", log_text)])
+  cp_load_var = (
+    [re.findall("\W(\w+)\W", var_list)
+      for var_list in re.findall("cp_load_var\s+\[(.*)\]", log_text)])
   stats_display = (
     [int(val) for val in re.findall("stats_display\s+(\d+)", log_text)])
   generate_plots = (
@@ -116,6 +119,8 @@ def read_params(log_text):
     "cp_load_name": cp_load_name if len(cp_load_name)>1 else cp_load_name[0],
     "cp_load_val": cp_load_val if len(cp_load_val)>1 else cp_load_val[0],
     "cp_load_ver": cp_load_ver if len(cp_load_ver)>1 else cp_load_ver[0],
+    "cp_load_var": cp_load_var if len(cp_load_var)>1 else cp_load_var[0]
+      if len(cp_load_var)>0 else cp_load_var,
     "stats_display": stats_display
       if len(stats_display)>1 else stats_display[0],
     "generate_plots": generate_plots
