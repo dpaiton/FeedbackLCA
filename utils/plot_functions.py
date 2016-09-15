@@ -171,72 +171,72 @@ Args:
 """
 def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   ## Loss over time
-  fig, sub_axes = plt.subplots(2,3)
   unsup_loss = data["unsup_loss"]
   (nimgs, nsteps) = unsup_loss.shape
-  t = np.arange(nsteps)
+  unsup_t = np.arange(nsteps)
   unsup_loss_mean = np.mean(unsup_loss, axis=0)
   unsup_loss_sem = np.std(unsup_loss, axis=0) / np.sqrt(nimgs)
-  sub_axes[0,0].plot(t, unsup_loss_mean, "k-")
-  sub_axes[0,0].fill_between(t, unsup_loss_mean-unsup_loss_sem,
-    unsup_loss_mean+unsup_loss_sem, alpha=0.5)
 
   euc_loss = data["euc_loss"]
   (nimgs, nsteps) = euc_loss.shape
-  t = np.arange(nsteps)
+  euc_t = np.arange(nsteps)
   euc_mean = np.mean(euc_loss, axis=0)
   euc_sem = np.std(euc_loss, axis=0) / np.sqrt(nimgs)
-  sub_axes[0,1].plot(t, euc_mean, "k-")
-  sub_axes[0,1].fill_between(t, euc_mean-euc_sem,
-    euc_mean+euc_sem, alpha=0.5)
 
   sparse_loss = data["sparse_loss"]
-  (nimgs, nsteps) = euc_loss.shape
-  t = np.arange(nsteps)
-  euc_mean = np.mean(euc_loss, axis=0)
-  euc_sem = np.std(euc_loss, axis=0) / np.sqrt(nimgs)
-  sub_axes[0,2].plot(t, euc_mean, "k-")
-  sub_axes[0,2].fill_between(t, euc_mean-euc_sem,
-    euc_mean+euc_sem, alpha=0.5)
+  (nimgs, nsteps) = sparse_loss.shape
+  sparse_t = np.arange(nsteps)
+  sparse_mean = np.mean(sparse_loss, axis=0)
+  sparse_sem = np.std(sparse_loss, axis=0) / np.sqrt(nimgs)
 
   xent_loss = data["xent_loss"]
-  (nimgs, nsteps) = euc_loss.shape
-  t = np.arange(nsteps)
-  euc_mean = np.mean(euc_loss, axis=0)
-  euc_sem = np.std(euc_loss, axis=0) / np.sqrt(nimgs)
-  sub_axes[1,0].plot(t, euc_mean, "k-")
-  sub_axes[1,0].fill_between(t, euc_mean-euc_sem,
-    euc_mean+euc_sem, alpha=0.5)
+  (nimgs, nsteps) = xent_loss.shape
+  xent_t = np.arange(nsteps)
+  xent_mean = np.mean(xent_loss, axis=0)
+  xent_sem = np.std(xent_loss, axis=0) / np.sqrt(nimgs)
 
   psnr = data["psnr"]
   (nimgs, nsteps) = psnr.shape
-  t = np.arange(nsteps)
+  psnr_t = np.arange(nsteps)
   psnr_mean = np.mean(psnr, axis=0)
   psnr_sem = np.std(psnr, axis=0) / np.sqrt(nimgs)
-  sub_axes[1,1].plot(t, psnr_mean, "k-")
-  sub_axes[1,1].fill_between(t, psnr_mean-psnr_sem,
-    psnr_mean+psnr_sem, alpha=0.5)
 
-  sub_axes[0,0].get_xaxis().set_ticklabels([])
-  sub_axes[0,1].get_xaxis().set_ticklabels([])
-  sub_axes[0,2].set_xlabel("Time Step (dt = 1 msec)")
-  sub_axes[1,0].get_xaxis().set_ticklabels([])
-  sub_axes[1,1].set_xlabel("Time Step (dt = 1 msec)")
-  sub_axes[1,2].get_xaxis().set_ticklabels([])
+  ## Loss figures
+  fig, sub_axes = plt.subplots(2,3)
 
+  sub_axes[0,0].plot(unsup_t, unsup_loss_mean, "k-")
+  sub_axes[0,0].fill_between(unsup_t, unsup_loss_mean-unsup_loss_sem,
+    unsup_loss_mean+unsup_loss_sem, alpha=0.5)
   sub_axes[0,0].set_ylabel("Unsupervised Loss")
-  sub_axes[0,1].set_ylabel("Euclidean Loss")
-  sub_axes[0,2].set_ylabel("Sparse Loss")
-  sub_axes[1,0].set_ylabel("Cross Entropy Loss")
-  sub_axes[1,1].set_ylabel("Recon pSNR dB")
-  sub_axes[1,2].get_yaxis().set_ticklabels([])
+  sub_axes[0,0].set_xlabel("Time Step (dt=1ms)")
 
-  ylabel_xpos = -0.1
-  sub_axes[0,0].yaxis.set_label_coords(ylabel_xpos, 0.5)
-  sub_axes[0,1].yaxis.set_label_coords(ylabel_xpos, 0.5)
-  sub_axes[0,2].yaxis.set_label_coords(ylabel_xpos, 0.5)
-  sub_axes[1,0].yaxis.set_label_coords(ylabel_xpos, 0.5)
-  sub_axes[1,1].yaxis.set_label_coords(ylabel_xpos, 0.5)
+  sub_axes[0,1].plot(euc_t, euc_mean, "k-")
+  sub_axes[0,1].fill_between(euc_t, euc_mean-euc_sem,
+    euc_mean+euc_sem, alpha=0.5)
+  sub_axes[0,1].set_xlabel("Time Step (dt=1ms)")
+  sub_axes[0,1].set_ylabel("Euclidean Loss")
+
+  sub_axes[0,2].plot(sparse_t, sparse_mean, "k-")
+  sub_axes[0,2].fill_between(sparse_t, sparse_mean-sparse_sem,
+    sparse_mean+sparse_sem, alpha=0.5)
+  sub_axes[0,2].set_xlabel("Time Step (dt=1ms)")
+  sub_axes[0,2].set_ylabel("Sparse Loss")
+
+  sub_axes[1,0].plot(xent_t, xent_mean, "k-")
+  sub_axes[1,0].fill_between(xent_t, xent_mean-xent_sem,
+    xent_mean+xent_sem, alpha=0.5)
+  sub_axes[1,0].set_xlabel("Time Step (dt=1ms)")
+  sub_axes[1,0].set_ylabel("Cross Entropy Loss")
+
+  sub_axes[1,1].plot(psnr_t, psnr_mean, "k-")
+  sub_axes[1,1].fill_between(psnr_t, psnr_mean-psnr_sem,
+    psnr_mean+psnr_sem, alpha=0.5)
+  sub_axes[1,1].set_xlabel("Time Step (dt=1ms)")
+  sub_axes[1,1].set_ylabel("Recon pSNR dB")
+
+  sub_axes[1,2].axis('off')
+
+  fig.tight_layout()
   fig.suptitle("Average Statistics During Inference", y=1.0, x=0.5)
   out_filename = (base_filename+"_inference_stats"+file_ext)
   fig.savefig(out_filename, transparent=True)
