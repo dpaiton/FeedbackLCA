@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 
 """
 Normalize data
@@ -89,17 +90,15 @@ Args:
   base_filename: [str] containing the base filename for outputs. Since multiple
     outputs are created, file extension should not be included.
   file_ext: [str] containing the file extension for the output images
+  img_idx: [int] which image in data["images"] to run analysis on
 """
-def save_inference_traces(data, base_filename, file_ext):
+def save_inference_traces(data, base_filename, file_ext, img_idx=0):
   (num_images, num_timesteps, num_neurons) = data["b"].shape
-  img_idx = 0
-  max_val = np.max([data["b"][img_idx,...], data["u"][img_idx,...],
-    data["ga"][img_idx,...], data["a"][img_idx,...]])
-  min_val = np.min([data["b"][img_idx,...], data["u"][img_idx,...],
-    data["ga"][img_idx,...], data["a"][img_idx,...]])
-  fig, sub_axes = plt.subplots(int(np.sqrt(num_neurons)+1),
-    int(np.sqrt(num_neurons)))
-  for (axis_idx, axis) in enumerate(fig.axes):
+  sqrt_nn = int(np.sqrt(num_neurons))
+  global_max_val = float(np.max([data["b"][img_idx,...],
+    data["u"][img_idx,...], data["ga"][img_idx,...], data["a"][img_idx,...]]))
+  fig, sub_axes = plt.subplots(sqrt_nn+1, sqrt_nn)
+  for (axis_idx, axis) in enumerate(fig.axes): # one axis per neuron
     if axis_idx < num_neurons:
       t = np.arange(data["b"].shape[1])
       b = data["b"][img_idx,:,axis_idx]
@@ -111,10 +110,25 @@ def save_inference_traces(data, base_filename, file_ext):
       axis.plot(t, u, linewidth=0.25, color="b", label="u")
       axis.plot(t, ga, linewidth=0.25, color="r", label="Ga")
       axis.plot(t, fb, linewidth=0.25, color="y", label="fb")
-      axis.plot(t, [0 for _ in t], linewidth=0.25,
-        color="k", linestyle="-", label="zero")
-    #axis.set_ylim((min_val, max_val))
-    #axis.set_aspect(1.0001)
+      axis.plot(t, [0 for _ in t], linewidth=0.25, color="k", linestyle="-",
+        label="zero")
+      axis.plot(t, [data["threshold"] for _ in t], linewidth=0.25, color="k",
+        linestyle=":", dashes=(1,1), label="threshold")
+      if (a[-1] > 0):
+        for spine in axis.spines.values():
+          spine.set_edgecolor('magenta')
+      max_val = np.max([b, ga, fb, u, a])
+      scale_ratio = max_val / global_max_val
+      transFigure = fig.transFigure.inverted()
+      axis_height = axis.get_window_extent().transformed(transFigure).height
+      line_length = axis_height * scale_ratio
+      x_offset = 0.003
+      axis_origin = transFigure.transform(axis.transAxes.transform([0,0]))
+      coord1 = [axis_origin[0] - x_offset, axis_origin[1]]
+      coord2 = [coord1[0], coord1[1] + line_length]
+      line = matplotlib.lines.Line2D((coord1[0], coord2[0]), (coord1[1],
+        coord2[1]), transform=fig.transFigure, color='0.3')
+      fig.lines.append(line)
     axis.tick_params(
       axis="both",
       which="both",
@@ -126,19 +140,15 @@ def save_inference_traces(data, base_filename, file_ext):
       labeltop="off",
       labelleft="off",
       labelright="off")
-    if a.any() > 0:
-      for spine in axis.spines.values():
-        spine.set_edgecolor('magenta')
   num_pixels = np.size(data["images"][img_idx])
   image = data["images"][img_idx,...].reshape(int(np.sqrt(num_pixels)),
     int(np.sqrt(num_pixels)))
-  sub_axes[int(np.sqrt(num_neurons)), 0].imshow(image, cmap="Greys",
-    interpolation="nearest")
-  for plot_col in range(int(np.sqrt(num_neurons))):
-    sub_axes[int(np.sqrt(num_neurons)), plot_col].axis("off")
-    sub_axes[int(np.sqrt(num_neurons)), plot_col].get_xaxis().set_visible(False)
-    sub_axes[int(np.sqrt(num_neurons)), plot_col].get_yaxis().set_visible(False)
-    sub_axes[int(np.sqrt(num_neurons)), plot_col].tick_params(
+  sub_axes[sqrt_nn, 0].imshow(image, cmap="Greys", interpolation="nearest")
+  for plot_col in range(sqrt_nn):
+    sub_axes[sqrt_nn, plot_col].axis("off")
+    sub_axes[sqrt_nn, plot_col].get_xaxis().set_visible(False)
+    sub_axes[sqrt_nn, plot_col].get_yaxis().set_visible(False)
+    sub_axes[sqrt_nn, plot_col].tick_params(
       axis="both",
       which="both",
       bottom="off",
@@ -149,10 +159,6 @@ def save_inference_traces(data, base_filename, file_ext):
       labeltop="off",
       labelleft="off",
       labelright="off")
-  #sub_axes[0, 19].legend(bbox_to_anchor=(1.1, 1.0), ncol=1, fancybox=True)
-  #sub_axes[0].set_xlabel("Time Step (dt = 1 msec)")
-  #sub_axes[2].set_ylabel("LCA Input Traces")
-  #sub_axes[2].yaxis.set_label_coords(ylabel_xpos, 0.5)
   fig.suptitle("LCA Activity", y=0.99, x=0.5)
   out_filename = (base_filename+"_lca_traces"+file_ext)
   fig.savefig(out_filename, transparent=True)
