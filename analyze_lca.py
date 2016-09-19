@@ -47,7 +47,8 @@ def compute_inference(args, data):
   fb = np.zeros(out_shape)
   u = np.zeros(out_shape)
   a = np.zeros(out_shape)
-  psnr = np.zeros((args["num_inference_images"], args["num_inference_steps"]))
+  psnr = np.zeros((args["num_inference_images"],
+    args["num_inference_steps"]))
   euc_loss = np.zeros((args["num_inference_images"],
     args["num_inference_steps"]))
   sparse_loss = np.zeros((args["num_inference_images"],
@@ -64,6 +65,7 @@ def compute_inference(args, data):
         np.expand_dims(data.labels.T[:,0], axis=1))
     tmp_sess.run(model.init_op, feed_dict)
     model.weight_saver.restore(tmp_sess, args["checkpoint"])
+    threshold = tmp_sess.run(model.sparse_mult, feed_dict)
     for img_idx in range(args["num_inference_images"]):
       image = data.next_batch(1)[0].T
       label = data.next_batch(1)[1].T
@@ -90,7 +92,8 @@ def compute_inference(args, data):
         tmp_sess.run(model.step_lca, feed_dict)
     return {"b":b, "ga":ga, "fb":fb, "u":u, "a":a, "psnr":psnr, "recon":recon,
       "sparse_loss":sparse_loss, "euc_loss":euc_loss, "unsup_loss":unsup_loss,
-      "xent_loss":xent_loss, "images":np.hstack(images).T}
+      "xent_loss":xent_loss, "images":np.hstack(images).T,
+      "threshold":threshold}
 
 """
 Evaluate model and return activations & weights
@@ -266,6 +269,7 @@ def main(args):
     ## Compute test & val performance for trained model
     chk_args = dict()
     sched_idx = len(sched)-1
+    #TODO: allow user to specify batch_idx if they want to
     batch_idx = 0
     for schedule in sched:
       batch_idx += schedule["num_batches"]
@@ -358,7 +362,8 @@ def main(args):
       ## Mean sparsity across the training set
       mean_sparsity = (100 * np.mean([np.count_nonzero(train["a"][:,idx])
         for idx in range(train["a"].shape[1])]) / float(train["a"].shape[0]))
-      print(("\tThe mean sparsity on the train set was %0.2f%%")%mean_sparsity)
+      print(("\tThe mean number of active nodes on the train set was %0.2f%%")%(
+       mean_sparsity))
 
       ## Mean reconstruction quality across the training set
       mean_recon_quality = np.mean(train["pSNRdB"])
@@ -414,8 +419,9 @@ if __name__ == "__main__":
   args = dict()
 
   #versions = [str(val) for val in range(0,8)]
-  versions = ["10"]
+  versions = ["0"]
 
+  #args["model_name"] = "test"
   args["model_name"] = "pretrain"
   #args["model_name"] = "nofb" # nofb_sup
   #args["model_name"] = "nofb_sup_nopre"
@@ -425,6 +431,8 @@ if __name__ == "__main__":
   #args["model_name"] = "fb_semisup_nopre"
   #args["model_name"] = "feedforward_semisup"
   #args["model_name"] = "mlp"
+
+  args["batch_idx"] = 10000 #Which checkpoint to load
 
   args["eval_train"] = True # Evaluate model stats on training set
   args["plot_sem"] = False # Plot SEM bars when able
