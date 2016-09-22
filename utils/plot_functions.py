@@ -95,8 +95,8 @@ Args:
 def save_inference_traces(data, base_filename, file_ext, img_idx=0):
   (num_images, num_timesteps, num_neurons) = data["b"].shape
   sqrt_nn = int(np.sqrt(num_neurons))
-  global_max_val = float(np.max([data["b"][img_idx,...],
-    data["u"][img_idx,...], data["ga"][img_idx,...], data["a"][img_idx,...]]))
+  global_max_val = float(np.max(np.abs([data["b"][img_idx,...],
+    data["u"][img_idx,...], data["ga"][img_idx,...], data["a"][img_idx,...]])))
   fig, sub_axes = plt.subplots(sqrt_nn+1, sqrt_nn)
   for (axis_idx, axis) in enumerate(fig.axes): # one axis per neuron
     if axis_idx < num_neurons:
@@ -117,7 +117,7 @@ def save_inference_traces(data, base_filename, file_ext, img_idx=0):
       if (a[-1] > 0):
         for spine in axis.spines.values():
           spine.set_edgecolor('magenta')
-      max_val = np.max([b, ga, fb, u, a])
+      max_val = np.max(np.abs([b, ga, fb, u, a]))
       scale_ratio = max_val / global_max_val
       transFigure = fig.transFigure.inverted()
       axis_height = axis.get_window_extent().transformed(transFigure).height
