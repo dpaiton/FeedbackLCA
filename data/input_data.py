@@ -3,7 +3,6 @@
 import numpy as np
 import random
 import gzip
-import tensorflow as tf
 
 class MNIST:
   def __init__(self,
