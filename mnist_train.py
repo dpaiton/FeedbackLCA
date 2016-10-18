@@ -14,7 +14,7 @@ import tensorflow as tf
 
 model_params = {
   "model_type": "Model",
-  "model_name": "mlp",
+  "model_name": "test",
   "output_dir": os.path.expanduser("~")+"/Work/Projects/",
   "data_dir": os.path.expanduser("~")+"/Work/Datasets/MNIST/",
   "base_version": "0",
@@ -61,18 +61,31 @@ model_schedule = [
   "staircase": [True],
   "num_batches": 150000},
 
-  {"weights": ["bias1", "bias2", "w"],
-  "recon_mult": 1.0,
-  "sparse_mult": 0.3,
+  #{"weights": ["phi", "bias", "w"],
+  #"recon_mult": 1.0,
+  #"sparse_mult": 0.3,
+  #"ent_mult": 0.1,
+  #"base_sup_mult": 1.0,
+  #"fb_mult": 0.1,
+  #"num_steps": 20,
+  #"weight_lr": [0.1,]*3,
+  #"decay_steps": [10000,]*3,
+  #"decay_rate": [0.8,]*3,
+  #"staircase": [True,]*3,
+  #"num_batches": 3000}]#,
+
+  {"weights": ["bias1", "phi", "bias2", "w"],
+  "recon_mult": 0.0,
+  "sparse_mult": 0.0,
   "ent_mult": 0.0,
-  "base_sup_mult": 0.1,
+  "base_sup_mult": 1.0,
   "fb_mult": 0.0,
   "num_steps": 20,
-  "weight_lr": [0.1]*3,
-  "decay_steps": [10000]*3,
-  "decay_rate": [0.8]*3,
-  "staircase": [True]*3,
-  "num_batches": 100000}]#,
+  "weight_lr": [0.1]*4,
+  "decay_steps": [50000]*4,
+  "decay_rate": [0.8]*4,
+  "staircase": [True]*4,
+  "num_batches": 3000}]#,
 
   #{"weights": ["e", "d", "g", "w", "a_bias", "c_bias"],
   #"recon_mult": 1.0,
@@ -87,8 +100,7 @@ model_schedule = [
   #"staircase": [True,]*6,
   #"num_batches": 10000}]#, {}]
 
-frac_keep_labels = [1.00]#, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02, 0.01, 0.004,
-  #0.001, 0.0004, 0.0002]
+frac_keep_labels = [0.01, 0.1, 0.004, 0.002, 0.001, 0.0004]
 
 for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
   model_params["version"] = model_params["base_version"]+"."+str(frac_keep_idx)
