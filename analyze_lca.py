@@ -49,7 +49,7 @@ def compute_inference(args, data):
   a = np.zeros(out_shape)
   psnr = np.zeros((args["num_inference_images"],
     args["num_inference_steps"]))
-  euc_loss = np.zeros((args["num_inference_images"],
+  rcon_loss = np.zeros((args["num_inference_images"],
     args["num_inference_steps"]))
   sparse_loss = np.zeros((args["num_inference_images"],
     args["num_inference_steps"]))
@@ -80,7 +80,7 @@ def compute_inference(args, data):
         u[img_idx, step, :] = np.squeeze(tmp_sess.run(model.u, feed_dict))
         a[img_idx, step, :] = np.squeeze(tmp_sess.run(model.a, feed_dict))
         psnr[img_idx, step] = np.squeeze(tmp_sess.run(model.pSNRdB, feed_dict))
-        euc_loss[img_idx, step] = np.squeeze(tmp_sess.run(model.euclidean_loss,
+        rcon_loss[img_idx, step] = np.squeeze(tmp_sess.run(model.recon_loss,
           feed_dict))
         sparse_loss[img_idx, step] = np.squeeze(tmp_sess.run(model.sparse_loss,
           feed_dict))
@@ -91,7 +91,7 @@ def compute_inference(args, data):
         recon[img_idx, step, :] = np.squeeze(tmp_sess.run(model.s_, feed_dict))
         tmp_sess.run(model.step_lca, feed_dict)
     return {"b":b, "ga":ga, "fb":fb, "u":u, "a":a, "psnr":psnr, "recon":recon,
-      "sparse_loss":sparse_loss, "euc_loss":euc_loss, "unsup_loss":unsup_loss,
+      "sparse_loss":sparse_loss, "rcon_loss":rcon_loss, "unsup_loss":unsup_loss,
       "xent_loss":xent_loss, "images":np.hstack(images).T,
       "threshold":threshold}
 
@@ -418,31 +418,36 @@ def main(args):
 if __name__ == "__main__":
   args = dict()
 
+  ## TODO: recon quality doesnt match mean reconstruction. recon is val?
+  ##       also, verify units for mean recon
+
   #versions = [str(val) for val in range(0,8)]
-  versions = ["0"]
+  versions = ["1"]
 
   #args["model_name"] = "test"
-  args["model_name"] = "pretrain"
-  #args["model_name"] = "nofb" # nofb_sup
-  #args["model_name"] = "nofb_sup_nopre"
-  #args["model_name"] = "nofb_semisup"
-  #args["model_name"] = "nofb_semisup_nopre"
-  #args["model_name"] = "fb_semisup"
-  #args["model_name"] = "fb_semisup_nopre"
-  #args["model_name"] = "feedforward_semisup"
+  #args["model_name"] = "pretrain"
   #args["model_name"] = "mlp"
+  #args["model_name"] = "mlp_rand"
+  #args["model_name"] = "mlp_pretrain_learn"
+  #args["model_name"] = "mlp_pretrain_nolearn"
+  #args["model_name"] = "mlp_norm"
+  #args["model_name"] = "mlp_nonorm"
+  #args["model_name"] = "dlca"
+  args["model_name"] = "dlca_pretrain"
+  #args["model_name"] = "dlcaf_pretrain"
+  #args["model_name"] = "dlcaf_pretrain_ent"
 
   args["batch_idx"] = 10000 #Which checkpoint to load
 
   args["eval_train"] = True # Evaluate model stats on training set
   args["plot_sem"] = False # Plot SEM bars when able
-  args["run_test"] = False # Evaluate model accuracy on test set
-  args["run_val"] = False # Evaluate model accuracy on validation set
+  args["run_test"] = True # Evaluate model accuracy on test set
+  args["run_val"] = True # Evaluate model accuracy on validation set
   args["inference"] = True # Evaluate LCA inference
 
   args["num_phi"] = 8 # How many phi to view for a given w connection
-  args["num_inference_images"] = 5 # How many images in average 
-  args["num_inference_steps"] = 30 # How many time steps in inference
+  args["num_inference_images"] = 5 # How many images in average
+  args["num_inference_steps"] = 20 # How many time steps in inference
 
   args["file_ext"] = ".pdf" # Output file format
   args["device"] = "/cpu:0" # Device for analysis runs
