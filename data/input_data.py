@@ -3,6 +3,8 @@
 import numpy as np
 import random
 import gzip
+import os
+import h5py
 
 class MNIST:
   def __init__(self,
@@ -100,6 +102,35 @@ class MNIST:
         labels = np.frombuffer(buf, dtype=np.uint8)
         return labels.astype(np.int32)
 
+class vanHateren:
+  def __init__(self,
+    img_dir,
+    patch_edge_size=None,
+    rand_seed=None):
+    self.images = self.extract_images(img_dir, patch_edge_size)
+
+  """
+  load in van hateren dataset
+  if patch_edge_size is specified, rebuild data array to be of sequential image
+  patches
+  """
+  def extract_images(self, filename, patch_edge_size=None):
+    with h5py.File(filename, "r") as f:
+      full_img_data = np.array(f['van_hateren_good'], dtype=np.float32)
+    if patch_edge_size is not None:
+      (num_img, num_px_rows, num_px_cols) = full_img_data.shape
+      num_img_px = num_px_rows * num_px_cols
+      assert np.sqrt(num_img_px) % patch_edge_size == 0, (
+        "The number of image edge pixels % the patch edge size must be 0.")
+      self.num_patches = int(num_img_px / patch_edge_size**2)
+      full_img_data = np.reshape(full_img_data, (num_img, num_img_px))
+      data = np.vstack([full_img_data[idx,...].reshape(self.num_patches, patch_edge_size,
+        patch_edge_size) for idx in range(num_img)])
+    else:
+      data = full_img_data
+      self.num_patches = 0
+    return data
+
 class dataset:
   def __init__(self, imgs, lbls, ignore_lbls, normalize=False):
     num_ex = imgs.shape[0]
@@ -152,9 +183,17 @@ class dataset:
       start = self.curr_epoch_idx
     self.batches_completed += 1
     self.curr_epoch_idx += batch_size
-    return (self.images[self.epoch_order[start:self.curr_epoch_idx], ...],
-      self.labels[self.epoch_order[start:self.curr_epoch_idx], ...],
-      self.ignore_labels[self.epoch_order[start:self.curr_epoch_idx], ...])
+    set_indices = self.epoch_order[start:self.curr_epoch_idx]
+    if self.labels is not None:
+      if self.ignore_labels is not None:
+        return (self.images[set_indices, ...],
+          self.labels[set_indices, ...],
+          self.ignore_labels[set_indices, ...])
+      return (self.images[set_indices, ...],
+        self.labels[set_indices, ...],
+        self.ignore_labels)
+    return (self.images[set_indices, ...],
+      self.labels, self.ignore_labels)
 
   """
   Increment member variables to reflect a step forward of num_advance images
@@ -222,7 +261,8 @@ def load_MNIST(
     else:
       val_lbls = train_val.labels[train_val.val_indices]
     val_ignore_lbls = val_lbls.copy()
-    val = dataset(val_imgs, val_lbls, val_ignore_lbls, normalize=normalize_imgs)
+    val = dataset(val_imgs, val_lbls, val_ignore_lbls,
+      normalize=normalize_imgs)
   else:
     val = None
 
@@ -246,3 +286,20 @@ def load_MNIST(
     normalize=normalize_imgs)
 
   return {"train":train, "val":val, "test":test}
+
+def load_vanHateren(
+  data_dir,
+  normalize_imgs=False,
+  whiten_imgs=True,
+  patch_edge_size=None,
+  rand_seed=None):
+
+  ## Training set
+  img_filename = data_dir+os.sep+"images_curated.h5"
+  vh_data = vanHateren(
+    img_filename,
+    patch_edge_size,
+    rand_seed=rand_seed)
+  images = dataset(vh_data.images, None, None, normalize=normalize_imgs)
+  setattr(images, "num_patches", vh_data.num_patches)
+  return {"train":images}
