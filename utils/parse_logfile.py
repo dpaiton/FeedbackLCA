@@ -196,9 +196,9 @@ def read_loss(log_text):
   recon_quality = np.array(
     [float(val)
     for val in re.findall("recon pSNR dB:\s+(\-?\d+\.?\d*)", log_text)])
-  euclidean_loss = np.array(
+  recon_loss = np.array(
     [float(val)
-    for val in re.findall("euclidean loss:\s+(\d+\.?\d*)", log_text)])
+    for val in re.findall("recon loss:\s+(\d+\.?\d*)", log_text)])
   sparse_loss = np.array(
     [float(val) for val in re.findall("sparse loss:\s+(\d+\.?\d*)", log_text)])
   unsupervised_loss = np.array(
@@ -222,11 +222,11 @@ def read_loss(log_text):
       if len(recon_quality)>1 else recon_quality[0])
   else:
     output["recon_quality"] = [0 for _ in batch_index]
-  if euclidean_loss.size != 0:
-    output["euclidean_loss"] = (euclidean_loss
-      if len(euclidean_loss)>1 else euclidean_loss[0])
+  if recon_loss.size != 0:
+    output["recon_loss"] = (recon_loss
+      if len(recon_loss)>1 else recon_loss[0])
   else:
-    output["euclidean_loss"] = [0 for _ in batch_index]
+    output["recon_loss"] = [0 for _ in batch_index]
   if perc_act.size != 0:
     output["perc_act"] = perc_act if len(perc_act)>1 else perc_act[0]
   else:

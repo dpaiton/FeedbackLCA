@@ -167,7 +167,7 @@ def save_inference_traces(data, base_filename, file_ext, img_idx=0):
 """
 Plot of inference statistics, including reconstruction, sparsity, cross-entropy
 Args:
-  data: [dict] with keys [unsup_loss, euc_loss, psnr, recon, images]
+  data: [dict] with keys [unsup_loss, rcon_loss, psnr, recon, images]
     Dictionary is created by analyze_lca.compute_inference()
   base_filename: [str] containing the base filename for outputs. Since multiple
     outputs are created, file extension should not be included.
@@ -183,11 +183,11 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   unsup_loss_mean = np.mean(unsup_loss, axis=0)
   unsup_loss_sem = np.std(unsup_loss, axis=0) / np.sqrt(nimgs)
 
-  euc_loss = data["euc_loss"]
-  (nimgs, nsteps) = euc_loss.shape
-  euc_t = np.arange(nsteps)
-  euc_mean = np.mean(euc_loss, axis=0)
-  euc_sem = np.std(euc_loss, axis=0) / np.sqrt(nimgs)
+  rcon_loss = data["rcon_loss"]
+  (nimgs, nsteps) = rcon_loss.shape
+  rcon_t = np.arange(nsteps)
+  rcon_mean = np.mean(rcon_loss, axis=0)
+  rcon_sem = np.std(rcon_loss, axis=0) / np.sqrt(nimgs)
 
   sparse_loss = data["sparse_loss"]
   (nimgs, nsteps) = sparse_loss.shape
@@ -216,9 +216,9 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   sub_axes[0,0].set_ylabel("Unsupervised Loss")
   sub_axes[0,0].set_xlabel("Time Step (dt=1ms)")
 
-  sub_axes[0,1].plot(euc_t, euc_mean, "k-")
-  sub_axes[0,1].fill_between(euc_t, euc_mean-euc_sem,
-    euc_mean+euc_sem, alpha=0.5)
+  sub_axes[0,1].plot(rcon_t, rcon_mean, "k-")
+  sub_axes[0,1].fill_between(rcon_t, rcon_mean-rcon_sem,
+    rcon_mean+rcon_sem, alpha=0.5)
   sub_axes[0,1].set_xlabel("Time Step (dt=1ms)")
   sub_axes[0,1].set_ylabel("Euclidean Loss")
 
@@ -271,20 +271,20 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
       title=title, save_filename=out_filename)
 
 """
-Generate cross-entropy, euclidean, and sparse loss vals
+Generate cross-entropy, recon, and sparse loss vals
 Outputs:
   fig: [int] corresponding to the figure number
 Args:
   data: [dict] containing keys
-    "batch_index", "euclidean_loss", "sparse_loss", "supervised_loss"
+    "batch_index", "recon_loss", "sparse_loss", "supervised_loss"
     all dict elements should contain lists of equal length
   out_filename: [str] containing the complete output filename
 """
 def save_losses(data, out_filename):
   fig, sub_axes = plt.subplots(4)
   axis_image = [None]*4
-  if "euclidean_loss" in data.keys():
-    axis_image[0] = sub_axes[0].plot(data["batch_index"], data["euclidean_loss"])
+  if "recon_loss" in data.keys():
+    axis_image[0] = sub_axes[0].plot(data["batch_index"], data["recon_loss"])
   if "sparse_loss" in data.keys():
     axis_image[1] = sub_axes[1].plot(data["batch_index"], data["sparse_loss"])
   if "supervised_loss" in data.keys():
