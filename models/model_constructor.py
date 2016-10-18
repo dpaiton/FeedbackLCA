@@ -113,20 +113,31 @@ class Model(object):
     self.rectify_a = bool(params["rectify_a"])
     self.norm_a = bool(params["norm_a"])
     self.norm_weights = bool(params["norm_weights"])
-    self.one_hot_labels = bool(params["one_hot_labels"])
-    assert self.one_hot_labels, (
-      "One-hot labels are currently the only type supported.")
+    if "one_hot_labels" in params.keys():
+      self.one_hot_labels = bool(params["one_hot_labels"])
+    else:
+      self.one_hot_labels = False
+      print("Warning: One-hot labels are not supported for supervised models.")
     # Hyper-parameters
     self.batch_size = int(params["batch_size"])
     self.num_pixels = int(params["num_pixels"])
     self.num_neurons = int(params["num_neurons"])
-    self.num_classes = int(params["num_classes"])
-    self.num_val = int(params["num_val"])
+    if "num_classes" in params.keys():
+      self.num_classes = int(params["num_classes"])
+    else:
+      self.num_classes = 0
+    if "num_val" in params.keys():
+      self.num_val = int(params["num_val"])
+    else:
+      self.num_val = 0
     self.phi_shape = [self.num_pixels, self.num_neurons]
     self.w_shape = [self.num_classes, self.num_neurons]
     # Output generation
     self.stats_display = int(params["stats_display"])
-    self.val_on_cp = bool(params["val_on_cp"])
+    if "val_on_cp" in params.keys():
+      self.val_on_cp = bool(params["val_on_cp"])
+    else:
+      self.val_on_cp = False
     self.gen_plots = int(params["generate_plots"])
     self.disp_plots = bool(params["display_plots"])
     self.save_plots = bool(params["save_plots"])
@@ -250,7 +261,7 @@ class Model(object):
 
         with tf.name_scope("loss") as scope:
           with tf.name_scope("unsupervised"):
-            self.euclidean_loss = self.recon_mult * tf.reduce_mean(0.5 *
+            self.recon_loss = self.recon_mult * tf.reduce_mean(0.5 *
               tf.reduce_sum(tf.pow(tf.sub(self.s, self.s_), 2.0),
               reduction_indices=[0]))
             self.sparse_loss = self.sparse_mult * tf.reduce_mean(
@@ -259,7 +270,7 @@ class Model(object):
               -tf.reduce_sum(tf.mul(tf.clip_by_value(self.y_, self.eps, 1.0),
               tf.log(tf.clip_by_value(self.y_, self.eps, 1.0))),
               reduction_indices=[0]))
-            self.unsupervised_loss = (self.euclidean_loss + self.sparse_loss)
+            self.unsupervised_loss = (self.recon_loss + self.sparse_loss)
 
           with tf.name_scope("supervised"):
             with tf.name_scope("cross_entropy_loss"):
@@ -277,7 +288,7 @@ class Model(object):
           with tf.name_scope("reconstruction_quality"):
             MSE = tf.reduce_mean(tf.pow(tf.sub(self.s, self.s_), 2.0),
               name="mean_squared_error")
-            self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(255.0, 2.0), MSE)),
+            self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(1.0, 2.0), MSE)),
               name="recon_quality")
           with tf.name_scope("prediction_bools"):
             self.correct_prediction = tf.equal(tf.argmax(self.y_, dimension=0),
@@ -475,7 +486,7 @@ class Model(object):
     logging.info("Finished step %g out of %g for schedule %g"%(batch_step,
       self.get_sched("num_batches"), self.sched_idx))
     logging.info(
-      "\teuclidean loss:\t\t%g"%(self.euclidean_loss.eval(feed_dict)))
+      "\treconstruction loss:\t%g"%(self.recon_loss.eval(feed_dict)))
     logging.info("\tsparse loss:\t\t%g"%(self.sparse_loss.eval(feed_dict)))
     logging.info(
       "\tunsupervised loss:\t%g"%(self.unsupervised_loss.eval(feed_dict)))
@@ -650,7 +661,7 @@ class DRSAE(Model):
 
         with tf.name_scope("loss") as scope:
           with tf.name_scope("unsupervised"):
-            self.euclidean_loss = self.recon_mult * tf.reduce_mean(0.5 *
+            self.recon_loss = self.recon_mult * tf.reduce_mean(0.5 *
               tf.reduce_sum(tf.pow(tf.sub(self.s, self.s_), 2.0),
               reduction_indices=[0]))
             self.sparse_loss = self.sparse_mult * tf.reduce_mean(
@@ -659,7 +670,7 @@ class DRSAE(Model):
               -tf.reduce_sum(tf.mul(tf.clip_by_value(self.y_, self.eps, 1.0),
               tf.log(tf.clip_by_value(self.y_, self.eps, 1.0))),
               reduction_indices=[0]))
-            self.unsupervised_loss = (self.euclidean_loss + self.sparse_loss)
+            self.unsupervised_loss = (self.recon_loss + self.sparse_loss)
 
           with tf.name_scope("supervised"):
             with tf.name_scope("cross_entropy_loss"):
@@ -675,7 +686,7 @@ class DRSAE(Model):
           with tf.name_scope("reconstruction_quality"):
             MSE = tf.reduce_mean(tf.pow(tf.sub(self.s, self.s_), 2.0),
               name="mean_squared_error")
-            self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(255.0, 2.0), MSE)),
+            self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(1.0, 2.0), MSE)),
               name="recon_quality")
           with tf.name_scope("prediction_bools"):
             self.correct_prediction = tf.equal(tf.argmax(self.y_, dimension=0),
@@ -859,7 +870,7 @@ class LCAF(Model):
 
         with tf.name_scope("loss") as scope:
           with tf.name_scope("unsupervised"):
-            self.euclidean_loss = self.recon_mult * tf.reduce_mean(0.5 *
+            self.recon_loss = self.recon_mult * tf.reduce_mean(0.5 *
               tf.reduce_sum(tf.pow(tf.sub(self.s, self.s_), 2.0),
               reduction_indices=[0]))
             self.sparse_loss = self.sparse_mult * tf.reduce_mean(
@@ -868,7 +879,7 @@ class LCAF(Model):
               tf.log(self.y_)), reduction_indices=[0])
             self.mean_entropy_loss = (self.ent_mult * tf.reduce_mean(
               self.entropy_loss, name="mean_entropy_loss"))
-            self.unsupervised_loss = (self.euclidean_loss + self.sparse_loss)
+            self.unsupervised_loss = (self.recon_loss + self.sparse_loss)
 
           with tf.name_scope("supervised"):
             with tf.name_scope("cross_entropy_loss"):
@@ -901,8 +912,7 @@ class LCAF(Model):
             self.fb = (self.sup_mult * self.fb_mult * self.label_mult
             * tf.matmul(tf.transpose(self.w), tf.sub(self.y_, self.y)))
 
-          self.du = (self.lca_b - self.lca_explain_away - self.u - self.fb)
-
+          self.du = self.lca_b - self.lca_explain_away - self.u - self.fb
           self.step_lca = tf.group(self.u.assign_add(self.eta * self.du),
             name="do_update_u")
           self.clear_u = tf.group(self.u.assign(self.u_zeros),
@@ -912,7 +922,7 @@ class LCAF(Model):
           with tf.name_scope("reconstruction_quality"):
             MSE = tf.reduce_mean(tf.pow(tf.sub(self.s, self.s_), 2.0),
               name="mean_squared_error")
-            self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(255.0, 2.0), MSE)),
+            self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(1.0, 2.0), MSE)),
               name="recon_quality")
           with tf.name_scope("prediction_bools"):
             self.correct_prediction = tf.equal(tf.argmax(self.y_, dimension=0),
@@ -920,5 +930,85 @@ class LCAF(Model):
           with tf.name_scope("accuracy"):
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction,
               tf.float32), name="avg_accuracy")
+
+    self.graph_built = True
+
+"""
+L1 sparse coding uses the l1 norm instead  of l2 norm for recon error
+"""
+class l1SC(Model):
+  def __init__(self, params, schedule):
+    Model.__init__(self, params, schedule)
+
+  def load_params(self, params):
+    Model.load_params(self, params)
+    self.eta = float(params["eta"])
+
+  """Build the TensorFlow graph object"""
+  def build_graph(self):
+    self.graph = tf.Graph()
+    with tf.device(self.device):
+      with self.graph.as_default():
+        with tf.name_scope("placeholders") as scope:
+          self.s = tf.placeholder(
+            tf.float32, shape=[self.num_pixels, None], name="input_data")
+          self.y = tf.placeholder(
+            tf.float32, shape=[self.num_classes, None], name="input_label")
+          self.sparse_mult = tf.placeholder(
+            tf.float32, shape=(), name="sparse_mult")
+          self.recon_mult = tf.placeholder(
+            tf.float32, shape=(), name="recon_mult")
+
+        with tf.name_scope("constants") as scope:
+          self.a_zeros = tf.zeros(
+            shape=tf.pack([self.num_neurons, tf.shape(self.s)[1]]),
+            dtype=tf.float32, name="a_zeros")
+
+        with tf.name_scope("step_counter") as scope:
+          self.global_step = tf.Variable(0, trainable=False, name="global_step")
+
+        with tf.variable_scope("weights") as scope:
+          self.phi = tf.get_variable(name="phi", dtype=tf.float32,
+            initializer=tf.truncated_normal(self.phi_shape, mean=0.0,
+            stddev=1.0, dtype=tf.float32, name="phi_init"), trainable=True)
+
+        with tf.name_scope("normalize_weights") as scope:
+          self.norm_phi = self.phi.assign(tf.select(tf.greater(tf.abs(self.phi),
+           tf.ones_like(self.phi)), tf.sign(self.phi)*tf.ones_like(self.phi),
+           self.phi))
+          self.normalize_weights = tf.group(self.norm_phi,
+            name="do_normalization")
+
+        with tf.name_scope("inference") as scope:
+          self.a = tf.Variable(self.a_zeros, trainable=False,
+            validate_shape=False, name="a")
+
+        with tf.name_scope("output") as scope:
+          with tf.name_scope("image_estimate"):
+            self.s_ = tf.matmul(self.phi, self.a, name="reconstruction")
+
+        with tf.name_scope("loss") as scope:
+          with tf.name_scope("unsupervised"):
+            self.recon_loss = self.recon_mult * tf.reduce_mean(
+              tf.reduce_sum(tf.abs(tf.sub(self.s, self.s_)),
+              reduction_indices=[0]))
+            self.sparse_loss = self.sparse_mult * tf.reduce_mean(
+              tf.reduce_sum(tf.abs(self.a), reduction_indices=[0]))
+            self.unsupervised_loss = (self.recon_loss + self.sparse_loss)
+          self.total_loss = self.unsupervised_loss
+
+        with tf.name_scope("update_a") as scope:
+          self.da = tf.gradients(self.unsupervised_loss, self.a)[0]
+          self.step_a = tf.group(self.a.assign_add(self.eta * self.da),
+            name="do_update_a")
+          self.clear_a = tf.group(self.a.assign(self.a_zeros),
+            name="do_clear_a")
+
+        with tf.name_scope("performance_metrics") as scope:
+          with tf.name_scope("reconstruction_quality"):
+            MSE = tf.reduce_mean(tf.pow(tf.sub(self.s, self.s_), 2.0),
+              name="mean_squared_error")
+            self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(1.0, 2.0), MSE)),
+              name="recon_quality")
 
     self.graph_built = True
