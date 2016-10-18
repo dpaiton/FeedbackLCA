@@ -49,15 +49,16 @@ class MNIST:
 
     ## Construct list of images to be ignored
     if self.num_keep < self.num_imgs:
-      self.ignore_indices = []
+      ignore_idx_list = []
       for lbl in range(0, self.num_classes):
         lbl_loc = [idx
           for idx
           in np.arange(len(self.img_indices), dtype=np.int32)
           if self.labels[self.img_indices[idx]] == lbl]
-        np.append(self.ignore_indices, np.random.choice(lbl_loc, 
+        ignore_idx_list.extend(np.random.choice(lbl_loc,
           size=int(len(lbl_loc) - (self.num_keep/float(self.num_classes))),
-          replace=False))
+          replace=False).tolist())
+      self.ignore_indices = np.array(ignore_idx_list, dtype=np.int32)
     else:
       self.ignore_indices = None
 
