@@ -110,7 +110,8 @@ class Model(object):
     else:
       self.version = str(params["base_version"])
     self.optimizer = str(params["optimizer"])
-    self.rectify_a = bool(params["rectify_a"])
+    if "rectify_a" in params.keys():
+      self.rectify_a = bool(params["rectify_a"])
     self.norm_a = bool(params["norm_a"])
     self.norm_weights = bool(params["norm_weights"])
     if "one_hot_labels" in params.keys():
@@ -294,6 +295,12 @@ class Model(object):
             self.correct_prediction = tf.equal(tf.argmax(self.y_, dimension=0),
               tf.argmax(self.y, dimension=0), name="individual_accuracy")
           with tf.name_scope("accuracy"):
+            # TODO: Fix this for unlabeled examples,
+            #       don't compute diff if sum(y) = 0.
+            #       or just use argmax?
+            # TODO: Add entropy term to inference plots
+            # TODO: Fix recons to be from 0 - 1 where 0 is white and 1 is black
+            # TODO: Fix recons to do t=20 instead of just t=0, t=10
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction,
               tf.float32), name="avg_accuracy")
 
@@ -460,12 +467,15 @@ class Model(object):
     input_data: data to be placed in self.s
     input_label: label to be placed in self.y
   """
-  def get_feed_dict(self, input_data, input_labels):
+  def get_feed_dict(self, input_data, input_label=None):
     placeholders = [op.name
       for op
       in self.graph.get_operations()
       if "placeholders" in op.name][2:]
-    feed_dict = {self.s:input_data, self.y:input_labels}
+    if input_label is not None:
+      feed_dict = {self.s:input_data, self.y:input_label}
+    else:
+      feed_dict = {self.s:input_data}
     for placeholder in placeholders:
       feed_dict[self.graph.get_tensor_by_name(placeholder+":0")] = (
         self.get_sched(placeholder.split('/')[1]))
@@ -481,23 +491,29 @@ class Model(object):
   def print_update(self, input_data, input_label, batch_step):
     current_step = self.global_step.eval()
     feed_dict = self.get_feed_dict(input_data, input_label)
-    a_vals = self.a.eval(feed_dict)
+    a_vals = tf.get_default_session().run(self.a, feed_dict)
     logging.info("Global batch index is %g"%(current_step))
     logging.info("Finished step %g out of %g for schedule %g"%(batch_step,
       self.get_sched("num_batches"), self.sched_idx))
-    logging.info(
-      "\treconstruction loss:\t%g"%(self.recon_loss.eval(feed_dict)))
-    logging.info("\tsparse loss:\t\t%g"%(self.sparse_loss.eval(feed_dict)))
-    logging.info(
-      "\tunsupervised loss:\t%g"%(self.unsupervised_loss.eval(feed_dict)))
-    logging.info("\tsupervised loss:\t%g"%(
-      self.supervised_loss.eval(feed_dict)))
+    if hasattr(self, "recon_loss"):
+      logging.info(
+        "\treconstruction loss:\t%g"%(self.recon_loss.eval(feed_dict)))
+    if hasattr(self, "sparse_loss"):
+      logging.info("\tsparse loss:\t\t%g"%(self.sparse_loss.eval(feed_dict)))
+    if hasattr(self, "unsupervised_loss"):
+      logging.info(
+        "\tunsupervised loss:\t%g"%(self.unsupervised_loss.eval(feed_dict)))
+    if hasattr(self, "supervised_loss"):
+      logging.info("\tsupervised loss:\t%g"%(
+        self.supervised_loss.eval(feed_dict)))
     logging.info("\tmax val of a:\t\t%g"%(a_vals.max()))
     logging.info("\tpercent active:\t\t%0.2f%%"%(
       100.0 * np.count_nonzero(a_vals)
       / float(self.num_neurons * self.batch_size)))
-    logging.info("\trecon pSNR dB:\t\t%g"%(self.pSNRdB.eval(feed_dict)))
-    logging.info("\ttrain accuracy:\t\t%g"%(self.accuracy.eval(feed_dict)))
+    if hasattr(self, "pSNRdB"):
+      logging.info("\trecon pSNR dB:\t\t%g"%(self.pSNRdB.eval(feed_dict)))
+    if hasattr(self, "accuracy"):
+      logging.info("\ttrain accuracy:\t\t%g"%(self.accuracy.eval(feed_dict)))
 
   """
   Plot weights, reconstruction, and gradients
@@ -507,41 +523,47 @@ class Model(object):
     feed_dict = self.get_feed_dict(input_image, input_label)
     current_step = str(self.global_step.eval())
     if self.disp_plots:
-      self.recon_prev_fig = pf.display_data_tiled(
-        tf.transpose(self.s_).eval(feed_dict).reshape(
-        self.batch_size, int(np.sqrt(self.num_pixels)),
-        int(np.sqrt(self.num_pixels))), title=("Reconstructions at step "
-        +current_step), prev_fig=self.recon_prev_fig)
-      self.w_prev_fig = pf.display_data_tiled(
-        self.w.eval().reshape(self.num_classes,
-        int(np.sqrt(self.num_neurons)), int(np.sqrt(self.num_neurons))),
-        title="Classification matrix at step number "+current_step,
-        prev_fig=self.w_prev_fig)
-      self.phi_prev_fig = pf.display_data_tiled(
-        tf.transpose(self.phi).eval().reshape(self.num_neurons,
-        int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
-        title="Dictionary at step "+current_step,
-        prev_fig=self.phi_prev_fig)
+      if hasattr(self, "s_"):
+        self.recon_prev_fig = pf.display_data_tiled(
+          tf.transpose(self.s_).eval(feed_dict).reshape(
+          self.batch_size, int(np.sqrt(self.num_pixels)),
+          int(np.sqrt(self.num_pixels))), title=("Reconstructions at step "
+          +current_step), prev_fig=self.recon_prev_fig)
+      if hasattr(self, "w"):
+        self.w_prev_fig = pf.display_data_tiled(
+          self.w.eval().reshape(self.num_classes,
+          int(np.sqrt(self.num_neurons)), int(np.sqrt(self.num_neurons))),
+          title="Classification matrix at step number "+current_step,
+          prev_fig=self.w_prev_fig)
+      if hasattr(self, "phi"):
+        self.phi_prev_fig = pf.display_data_tiled(
+          tf.transpose(self.phi).eval().reshape(self.num_neurons,
+          int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
+          title="Dictionary at step "+current_step,
+          prev_fig=self.phi_prev_fig)
     if self.save_plots:
-      pf.save_data_tiled(
-        tf.transpose(self.s_).eval(feed_dict).reshape(
-        self.batch_size, int(np.sqrt(self.num_pixels)),
-        int(np.sqrt(self.num_pixels))), normalize=False,
-        title=("Reconstructions at step "+current_step),
-        save_filename=(self.disp_dir+"recon_v"+self.version+"-"
-        +current_step.zfill(5)+".pdf"))
-      pf.save_data_tiled(
-        self.w.eval().reshape(self.num_classes,
-        int(np.sqrt(self.num_neurons)), int(np.sqrt(self.num_neurons))),
-        normalize=True, title="Classification matrix at step number "
-        +current_step, save_filename=(self.disp_dir+"w_v"+self.version+"-"
-        +current_step.zfill(5)+".pdf"))
-      pf.save_data_tiled(
-        tf.transpose(self.phi).eval().reshape(self.num_neurons,
-        int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
-        normalize=True, title="Dictionary at step "+current_step,
-        save_filename=(self.disp_dir+"phi_v"+self.version+"-"
-        +current_step.zfill(5)+".pdf"))
+      if hasattr(self, "s_"):
+        pf.save_data_tiled(
+          tf.transpose(self.s_).eval(feed_dict).reshape(
+          self.batch_size, int(np.sqrt(self.num_pixels)),
+          int(np.sqrt(self.num_pixels))), normalize=False,
+          title=("Reconstructions at step "+current_step),
+          save_filename=(self.disp_dir+"recon_v"+self.version+"-"
+          +current_step.zfill(5)+".pdf"))
+      if hasattr(self, "w"):
+        pf.save_data_tiled(
+          self.w.eval().reshape(self.num_classes,
+          int(np.sqrt(self.num_neurons)), int(np.sqrt(self.num_neurons))),
+          normalize=True, title="Classification matrix at step number "
+          +current_step, save_filename=(self.disp_dir+"w_v"+self.version+"-"
+          +current_step.zfill(5)+".pdf"))
+      if hasattr(self, "phi"):
+        pf.save_data_tiled(
+          tf.transpose(self.phi).eval().reshape(self.num_neurons,
+          int(np.sqrt(self.num_pixels)), int(np.sqrt(self.num_pixels))),
+          normalize=True, title="Dictionary at step "+current_step,
+          save_filename=(self.disp_dir+"phi_v"+self.version+"-"
+          +current_step.zfill(5)+".pdf"))
       for weight_grad_var in self.grads_and_vars[self.sched_idx]:
         grad = weight_grad_var[0][0].eval(feed_dict)
         shape = grad.shape
@@ -915,6 +937,11 @@ class LCAF(Model):
           self.du = self.lca_b - self.lca_explain_away - self.u - self.fb
           self.step_lca = tf.group(self.u.assign_add(self.eta * self.du),
             name="do_update_u")
+          # TODO: DO THIS instead of other thing
+          #self.u_t = tf.Variable(...)
+          #for step in range(numSteps):
+          #  u_t[step] = u_t[step-1] + self.eta * self.du
+          #self.a = thresh(u_t[-1])
           self.clear_u = tf.group(self.u.assign(self.u_zeros),
             name="do_clear_u")
 
@@ -934,7 +961,7 @@ class LCAF(Model):
     self.graph_built = True
 
 """
-L1 sparse coding uses the l1 norm instead  of l2 norm for recon error
+L1 sparse coding uses the l1 norm instead of l2 norm for recon error
 """
 class l1SC(Model):
   def __init__(self, params, schedule):
@@ -942,7 +969,6 @@ class l1SC(Model):
 
   def load_params(self, params):
     Model.load_params(self, params)
-    self.eta = float(params["eta"])
 
   """Build the TensorFlow graph object"""
   def build_graph(self):
@@ -970,12 +996,12 @@ class l1SC(Model):
         with tf.variable_scope("weights") as scope:
           self.phi = tf.get_variable(name="phi", dtype=tf.float32,
             initializer=tf.truncated_normal(self.phi_shape, mean=0.0,
-            stddev=1.0, dtype=tf.float32, name="phi_init"), trainable=True)
+            stddev=0.5, dtype=tf.float32, name="phi_init"), trainable=True)
 
         with tf.name_scope("normalize_weights") as scope:
           self.norm_phi = self.phi.assign(tf.select(tf.greater(tf.abs(self.phi),
-           tf.ones_like(self.phi)), tf.sign(self.phi)*tf.ones_like(self.phi),
-           self.phi))
+           1.0), tf.sign(self.phi)*tf.ones_like(self.phi), self.phi))
+
           self.normalize_weights = tf.group(self.norm_phi,
             name="do_normalization")
 
@@ -999,7 +1025,12 @@ class l1SC(Model):
 
         with tf.name_scope("update_a") as scope:
           self.da = tf.gradients(self.unsupervised_loss, self.a)[0]
-          self.step_a = tf.group(self.a.assign_add(self.eta * self.da),
+
+          #if self.sched[self.sched_idx]["momentum"] > 0:
+          #  gamma = self.sched[self.sched_idx]["momentum"]
+
+          eta = self.sched[self.sched_idx]["eta"]
+          self.step_a = tf.group(self.a.assign_add(eta * self.da),
             name="do_update_a")
           self.clear_a = tf.group(self.a.assign(self.a_zeros),
             name="do_clear_a")
