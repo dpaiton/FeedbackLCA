@@ -295,12 +295,6 @@ class Model(object):
             self.correct_prediction = tf.equal(tf.argmax(self.y_, dimension=0),
               tf.argmax(self.y, dimension=0), name="individual_accuracy")
           with tf.name_scope("accuracy"):
-            # TODO: Fix this for unlabeled examples,
-            #       don't compute diff if sum(y) = 0.
-            #       or just use argmax?
-            # TODO: Add entropy term to inference plots
-            # TODO: Fix recons to be from 0 - 1 where 0 is white and 1 is black
-            # TODO: Fix recons to do t=20 instead of just t=0, t=10
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction,
               tf.float32), name="avg_accuracy")
 
@@ -513,7 +507,11 @@ class Model(object):
     if hasattr(self, "pSNRdB"):
       logging.info("\trecon pSNR dB:\t\t%g"%(self.pSNRdB.eval(feed_dict)))
     if hasattr(self, "accuracy"):
-      logging.info("\ttrain accuracy:\t\t%g"%(self.accuracy.eval(feed_dict)))
+      train_acc = self.accuracy.eval(feed_dict)
+      if train_acc >= 0:
+        logging.info("\ttrain accuracy:\t\t%g"%(self.accuracy.eval(feed_dict)))
+        logging.info("\tnum labeled data:\t%g"%(
+          self.num_labeled_ex.eval(feed_dict)))
 
   """
   Plot weights, reconstruction, and gradients
@@ -952,12 +950,24 @@ class LCAF(Model):
             self.pSNRdB = tf.mul(10.0, tf.log(tf.div(tf.pow(1.0, 2.0), MSE)),
               name="recon_quality")
           with tf.name_scope("prediction_bools"):
-            self.correct_prediction = tf.equal(tf.argmax(self.y_, dimension=0),
-              tf.argmax(self.y, dimension=0), name="individual_accuracy")
+            predictions = tf.equal(tf.argmax(self.y_,
+              dimension=0), tf.argmax(self.y, dimension=0),
+              name="individual_accuracy")
+            self.correct_prediction = tf.mul(tf.cast(predictions,
+              tf.float32), tf.reduce_sum(self.y, reduction_indices=[0]))
+            # TODO: Add entropy term to inference plots
+            # TODO: Fix recons to be from 0 - 1 where 0 is white and 1 is black
+            # TODO: Fix recons to do t=20 instead of just t=0, t=10
           with tf.name_scope("accuracy"):
-            self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction,
-              tf.float32), name="avg_accuracy")
-
+            label_indices = tf.where(tf.equal(tf.reduce_sum(self.y,
+              reduction_indices=[0]), 1), name="label_indices")
+            self.num_labeled_ex = tf.cast(tf.size(label_indices,
+              name="num_labeled_examples"), tf.float32)
+            self.accuracy = tf.cond(
+              tf.equal(self.num_labeled_ex, 0.0),
+              lambda: tf.constant(-1, dtype=tf.float32),
+              lambda: tf.div(tf.reduce_sum(self.correct_prediction,
+              name="prediction_sum"), self.num_labeled_ex, name="avg_accuracy"))
     self.graph_built = True
 
 """

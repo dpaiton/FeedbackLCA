@@ -13,7 +13,7 @@ from data.input_data import load_MNIST
 import tensorflow as tf
 
 model_params = {
-  "model_type": "Model",
+  "model_type": "LCAF",
   "model_name": "test",
   "output_dir": os.path.expanduser("~")+"/Work/Projects/",
   "data_dir": os.path.expanduser("~")+"/Work/Datasets/MNIST/",
@@ -48,7 +48,7 @@ model_params = {
   "rand_seed": 1234567890}
 
 model_schedule = [
-  {"weights": ["phi"],
+  {"weights": ["phi"], # Pretrain
   "recon_mult": 1.0,
   "sparse_mult": 0.3,
   "ent_mult": 0.0,
@@ -56,38 +56,64 @@ model_schedule = [
   "fb_mult": 0.0,
   "num_steps": 20,
   "weight_lr": [0.1],
-  "decay_steps": [10000],
+  "decay_steps": [50000],
   "decay_rate": [0.8],
   "staircase": [True],
   "num_batches": 150000},
 
-  #{"weights": ["phi", "bias", "w"],
+  #{"weights": ["bias1", "phi", "bias2", "w"], # MLP
+  #"recon_mult": 0.0,
+  #"sparse_mult": 0.0,
+  #"ent_mult": 0.0,
+  #"base_sup_mult": 1.0,
+  #"fb_mult": 0.0,
+  #"num_steps": 20,
+  #"weight_lr": [0.1]*4,
+  #"decay_steps": [50000]*4,
+  #"decay_rate": [0.8]*4,
+  #"staircase": [True]*4,
+  #"num_batches": 3000}]#,
+
+  #{"weights": ["phi", "bias", "w"], # DLCA
   #"recon_mult": 1.0,
-  #"sparse_mult": 0.3,
-  #"ent_mult": 0.1,
+  #"sparse_mult": 0.5,
+  #"ent_mult": 0.0,
+  #"base_sup_mult": 1.0,
+  #"fb_mult": 0.0,
+  #"num_steps": 20,
+  #"weight_lr": [0.1,]*3,
+  #"decay_steps": [50000,]*3,
+  #"decay_rate": [0.8,]*3,
+  #"staircase": [True,]*3,
+  #"num_batches": 300000}]#,
+
+  #{"weights": ["phi", "bias", "w"], # DLCAF
+  #"recon_mult": 1.0,
+  #"sparse_mult": 3.0,
+  #"ent_mult": 0.0,
   #"base_sup_mult": 1.0,
   #"fb_mult": 0.1,
   #"num_steps": 20,
   #"weight_lr": [0.1,]*3,
-  #"decay_steps": [10000,]*3,
+  #"decay_steps": [50000,]*3,
   #"decay_rate": [0.8,]*3,
   #"staircase": [True,]*3,
-  #"num_batches": 3000}]#,
+  #"num_batches": 300000}]#,
 
-  {"weights": ["bias1", "phi", "bias2", "w"],
-  "recon_mult": 0.0,
-  "sparse_mult": 0.0,
-  "ent_mult": 0.0,
+  {"weights": ["phi", "bias", "w"], # DLCAF_ent
+  "recon_mult": 1.0,
+  "sparse_mult": 1.0,
+  "ent_mult": 0.1,
   "base_sup_mult": 1.0,
-  "fb_mult": 0.0,
+  "fb_mult": 0.1,
   "num_steps": 20,
-  "weight_lr": [0.1]*4,
-  "decay_steps": [50000]*4,
-  "decay_rate": [0.8]*4,
-  "staircase": [True]*4,
-  "num_batches": 3000}]#,
+  "weight_lr": [0.1,]*3,
+  "decay_steps": [50000,]*3,
+  "decay_rate": [0.8,]*3,
+  "staircase": [True,]*3,
+  "num_batches": 300000},
 
-  #{"weights": ["e", "d", "g", "w", "a_bias", "c_bias"],
+  #{"weights": ["e", "d", "g", "w", "a_bias", "c_bias"], # DRSAE
   #"recon_mult": 1.0,
   #"sparse_mult": 0.1,
   #"ent_mult": 0.0,
@@ -100,7 +126,8 @@ model_schedule = [
   #"staircase": [True,]*6,
   #"num_batches": 10000}]#, {}]
 
-frac_keep_labels = [0.01, 0.1, 0.004, 0.002, 0.001, 0.0004]
+
+frac_keep_labels = [1.0, 0.1, 0.004, 0.002, 0.001, 0.0004]
 
 for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
   model_params["version"] = model_params["base_version"]+"."+str(frac_keep_idx)
@@ -157,9 +184,12 @@ for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
       assert model.get_sched() == schedule, ("Error: schedules do not match.")
 
       ## Rescale params for consistent output
-      frac_keep_mult = np.minimum(1.0 / frac_keep, 2.0)
-      model.set_sched("sup_mult",
-        model.get_sched("base_sup_mult") * frac_keep_mult)
+      if frac_keep > 0:
+        frac_keep_mult = np.minimum(1.0 / frac_keep, 2.0)
+        model.set_sched("sup_mult",
+          model.get_sched("base_sup_mult") * frac_keep_mult)
+      else:
+        model.set_sched("sup_mult", 0.0)
 
       ## Advance data counters & skip ahead if loaded checkpoint is ahead
       if model_params["cp_load"]:
@@ -210,7 +240,7 @@ for frac_keep_idx, frac_keep in enumerate(frac_keep_labels):
         current_step = sess.run(model.global_step)
         if (current_step % model.stats_display == 0
           and model.stats_display > 0):
-          model.print_update(input_images, input_labels, b_step+1)
+          model.print_update(input_images, input_ignore_labels, b_step+1)
 
         ## Validate model
         if (current_step % model.cp_int == 0
