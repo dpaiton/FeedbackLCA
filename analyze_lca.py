@@ -57,6 +57,8 @@ def compute_inference(args, data):
     args["num_inference_steps"]))
   xent_loss = np.zeros((args["num_inference_images"],
     args["num_inference_steps"]))
+  ent_loss = np.zeros((args["num_inference_images"],
+    args["num_inference_steps"]))
   recon = np.zeros((args["num_inference_images"],
     args["num_inference_steps"], args["model_params"]["num_pixels"]))
   images = [None]*args["num_inference_images"]
@@ -88,11 +90,13 @@ def compute_inference(args, data):
           model.unsupervised_loss, feed_dict))
         xent_loss[img_idx, step] = np.squeeze(tmp_sess.run(
           model.mean_cross_entropy_loss, feed_dict))
+        ent_loss[img_idx, step] = np.squeeze(tmp_sess.run(
+          model.mean_entropy_loss, feed_dict))
         recon[img_idx, step, :] = np.squeeze(tmp_sess.run(model.s_, feed_dict))
         tmp_sess.run(model.step_lca, feed_dict)
     return {"b":b, "ga":ga, "fb":fb, "u":u, "a":a, "psnr":psnr, "recon":recon,
       "sparse_loss":sparse_loss, "rcon_loss":rcon_loss, "unsup_loss":unsup_loss,
-      "xent_loss":xent_loss, "images":np.hstack(images).T,
+      "ent_loss":ent_loss, "xent_loss":xent_loss, "images":np.hstack(images).T,
       "threshold":threshold}
 
 """
@@ -315,7 +319,8 @@ def main(args):
         title = "Top & Bottom phi Elements for Digit "+str(c)
         out_filename = base_filename+"_top_phi_"+str(c)+args["file_ext"]
         normalize = True
-        pf.save_data_tiled(data, normalize, title, out_filename)
+        pf.save_data_tiled(data, normalize, title, out_filename, vmin=-1.0,
+          vmax=1.0)
 
       ## Frequency of activation per element across dataset
       perc_used = (100.0 * np.sort(np.sum(train["a"] != 0, axis=1))[::-1]
@@ -352,7 +357,7 @@ def main(args):
       fig_title = "Phi sorted by activation frequency in training set"
       normalize = True
       pf.save_data_tiled(weights_sorted, normalize, fig_title,
-        weight_out_filename)
+        weight_out_filename, vmin=-1.0, vmax=1.0)
 
       ## Compute entropy of class predictions across dataset
       ent = -np.sum(train["y_"] * np.log(train["y_"]+1e-16), axis=0)
@@ -418,11 +423,11 @@ def main(args):
 if __name__ == "__main__":
   args = dict()
 
-  ## TODO: recon quality doesnt match mean reconstruction. recon is val?
+  ## TODO: recon quality doesnt match mean reconstruction
   ##       also, verify units for mean recon
 
   #versions = [str(val) for val in range(0,8)]
-  versions = ["1"]
+  versions = ["0"]
 
   #args["model_name"] = "test"
   #args["model_name"] = "pretrain"
@@ -433,15 +438,16 @@ if __name__ == "__main__":
   #args["model_name"] = "mlp_norm"
   #args["model_name"] = "mlp_nonorm"
   #args["model_name"] = "dlca"
-  args["model_name"] = "dlca_pretrain"
-  #args["model_name"] = "dlcaf_pretrain"
-  #args["model_name"] = "dlcaf_pretrain_ent"
+  #args["model_name"] = "dlcaf_ent"
+  #args["model_name"] = "dlca_pretrain"
+  #args["model_name"] = "dlcaf_ent_pretrain"
+  args["model_name"] = "dlcaf_ent_pretrain_dlca"
 
-  args["batch_idx"] = 10000 #Which checkpoint to load
+  #args["batch_idx"] = 10000 #TODO: Specify which checkpoint to load
 
   args["eval_train"] = True # Evaluate model stats on training set
   args["plot_sem"] = False # Plot SEM bars when able
-  args["run_test"] = True # Evaluate model accuracy on test set
+  args["run_test"] = False # Evaluate model accuracy on test set
   args["run_val"] = True # Evaluate model accuracy on validation set
   args["inference"] = True # Evaluate LCA inference
 

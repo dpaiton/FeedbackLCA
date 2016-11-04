@@ -165,10 +165,12 @@ def save_inference_traces(data, base_filename, file_ext, img_idx=0):
   plt.close(fig)
 
 """
-Plot of inference statistics, including reconstruction, sparsity, cross-entropy
+Plot of inference statistics
+  reconstruction loss, sparsity, cross-entropy, entropy, unsupervised loss,
+  recon pSNRdb
 Args:
-  data: [dict] with keys [unsup_loss, rcon_loss, psnr, recon, images]
-    Dictionary is created by analyze_lca.compute_inference()
+  data: [dict] with keys [unsup_loss, rcon_loss, sparse_loss, xent_loss,
+    ent_loss, psnr]. Dictionary is created by analyze_lca.compute_inference()
   base_filename: [str] containing the base filename for outputs. Since multiple
     outputs are created, file extension should not be included.
   file_ext: [str] containing the file extension for the output images
@@ -201,6 +203,12 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   xent_mean = np.mean(xent_loss, axis=0)
   xent_sem = np.std(xent_loss, axis=0) / np.sqrt(nimgs)
 
+  ent_loss = data["ent_loss"]
+  (nimgs, nsteps) = ent_loss.shape
+  ent_t = np.arange(nsteps)
+  ent_mean = np.mean(ent_loss, axis=0)
+  ent_sem = np.std(ent_loss, axis=0) / np.sqrt(nimgs)
+
   psnr = data["psnr"]
   (nimgs, nsteps) = psnr.shape
   psnr_t = np.arange(nsteps)
@@ -214,33 +222,37 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   sub_axes[0,0].fill_between(unsup_t, unsup_loss_mean-unsup_loss_sem,
     unsup_loss_mean+unsup_loss_sem, alpha=0.5)
   sub_axes[0,0].set_ylabel("Unsupervised Loss")
-  sub_axes[0,0].set_xlabel("Time Step (dt=1ms)")
+  sub_axes[0,0].set_xlabel("Time Step")
 
   sub_axes[0,1].plot(rcon_t, rcon_mean, "k-")
   sub_axes[0,1].fill_between(rcon_t, rcon_mean-rcon_sem,
     rcon_mean+rcon_sem, alpha=0.5)
-  sub_axes[0,1].set_xlabel("Time Step (dt=1ms)")
   sub_axes[0,1].set_ylabel("Euclidean Loss")
+  sub_axes[0,1].set_xlabel("Time Step")
 
   sub_axes[0,2].plot(sparse_t, sparse_mean, "k-")
   sub_axes[0,2].fill_between(sparse_t, sparse_mean-sparse_sem,
     sparse_mean+sparse_sem, alpha=0.5)
-  sub_axes[0,2].set_xlabel("Time Step (dt=1ms)")
   sub_axes[0,2].set_ylabel("Sparse Loss")
+  sub_axes[0,2].set_xlabel("Time Step")
 
   sub_axes[1,0].plot(xent_t, xent_mean, "k-")
   sub_axes[1,0].fill_between(xent_t, xent_mean-xent_sem,
     xent_mean+xent_sem, alpha=0.5)
-  sub_axes[1,0].set_xlabel("Time Step (dt=1ms)")
   sub_axes[1,0].set_ylabel("Cross Entropy Loss")
+  sub_axes[1,0].set_xlabel("Time Step")
 
-  sub_axes[1,1].plot(psnr_t, psnr_mean, "k-")
-  sub_axes[1,1].fill_between(psnr_t, psnr_mean-psnr_sem,
+  sub_axes[1,1].plot(ent_t, ent_mean, "k-")
+  sub_axes[1,1].fill_between(ent_t, ent_mean-ent_sem,
+    ent_mean+ent_sem, alpha=0.5)
+  sub_axes[1,1].set_ylabel("Output Entropy")
+  sub_axes[1,1].set_xlabel("Time Step")
+
+  sub_axes[1,2].plot(psnr_t, psnr_mean, "k-")
+  sub_axes[1,2].fill_between(psnr_t, psnr_mean-psnr_sem,
     psnr_mean+psnr_sem, alpha=0.5)
-  sub_axes[1,1].set_xlabel("Time Step (dt=1ms)")
-  sub_axes[1,1].set_ylabel("Recon pSNR dB")
-
-  sub_axes[1,2].axis('off')
+  sub_axes[1,2].set_ylabel("Recon pSNR dB")
+  sub_axes[1,2].set_xlabel("Time Step")
 
   fig.tight_layout()
   fig.suptitle("Average Statistics During Inference", y=1.0, x=0.5)
@@ -254,7 +266,7 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
   out_filename = (base_filename+"_input"+file_ext)
   save_data_tiled(data["images"].reshape(num_images, int(np.sqrt(num_pixels)),
     int(np.sqrt(num_pixels))), normalize=False, title=title,
-    save_filename=out_filename)
+    save_filename=out_filename, vmin=0.0, vmax=1.0)
 
   for timestep in range(0, num_timesteps, num_skip):
     error = data["images"] - data["recon"][:, timestep, :]
@@ -262,13 +274,25 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
     out_filename = (base_filename+"_recon_err_t"+str(timestep)+file_ext)
     save_data_tiled(error.reshape(num_images, int(np.sqrt(num_pixels)),
       int(np.sqrt(num_pixels))), normalize=False, title=title,
-      save_filename=out_filename)
-
+      save_filename=out_filename, vmin=0.0, vmax=1.0)
     title = "Reconstruction for timestep "+str(timestep)
     out_filename = (base_filename+"_recon_t"+str(timestep)+file_ext)
     save_data_tiled(data["recon"][:, timestep, :].reshape(num_images,
       int(np.sqrt(num_pixels)), int(np.sqrt(num_pixels))), normalize=False,
-      title=title, save_filename=out_filename)
+      title=title, save_filename=out_filename, vmin=0.0, vmax=1.0)
+
+  if timestep < num_timesteps:
+    error = data["images"] - data["recon"][:, num_timesteps-1, :]
+    title = "Input - Reconstruction for timestep "+str(num_timesteps-1)
+    out_filename = (base_filename+"_recon_err_t"+str(num_timesteps-1)+file_ext)
+    save_data_tiled(error.reshape(num_images, int(np.sqrt(num_pixels)),
+      int(np.sqrt(num_pixels))), normalize=False, title=title,
+      save_filename=out_filename, vmin=0.0, vmax=1.0)
+    title = "Reconstruction for timestep "+str(num_timesteps-1)
+    out_filename = (base_filename+"_recon_t"+str(num_timesteps-1)+file_ext)
+    save_data_tiled(data["recon"][:, num_timesteps-1, :].reshape(num_images,
+      int(np.sqrt(num_pixels)), int(np.sqrt(num_pixels))), normalize=False,
+      title=title, save_filename=out_filename, vmin=0.0, vmax=1.0)
 
 """
 Generate cross-entropy, recon, and sparse loss vals
@@ -444,14 +468,15 @@ Inpus:
   save_filename: [str] holding output directory for writing,
     figures will not display with GUI if set
 """
-def save_data_tiled(data, normalize=False, title="", save_filename=""):
+def save_data_tiled(data, normalize=False, title="", save_filename="",
+  vmin=-1.0, vmax=1.0):
   if normalize:
     data = normalize_data(data)
   if len(data.shape) >= 3:
     data = pad_data(data)
   fig, sub_axis = plt.subplots(1)
   axis_image = sub_axis.imshow(data, cmap="Greys", interpolation="nearest")
-  axis_image.set_clim(vmin=-1.0, vmax=1.0)
+  axis_image.set_clim(vmin=vmin, vmax=vmax)
   cbar = fig.colorbar(axis_image)
   sub_axis.tick_params(
    axis="both",

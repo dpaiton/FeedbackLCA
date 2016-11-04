@@ -955,9 +955,6 @@ class LCAF(Model):
               name="individual_accuracy")
             self.correct_prediction = tf.mul(tf.cast(predictions,
               tf.float32), tf.reduce_sum(self.y, reduction_indices=[0]))
-            # TODO: Add entropy term to inference plots
-            # TODO: Fix recons to be from 0 - 1 where 0 is white and 1 is black
-            # TODO: Fix recons to do t=20 instead of just t=0, t=10
           with tf.name_scope("accuracy"):
             label_indices = tf.where(tf.equal(tf.reduce_sum(self.y,
               reduction_indices=[0]), 1), name="label_indices")
