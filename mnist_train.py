@@ -14,7 +14,7 @@ import tensorflow as tf
 
 model_params = {
   "model_type": "LCAF",
-  "model_name": "DLCA",
+  "model_name": "pretrain_dlca",
   "output_dir": os.path.expanduser("~")+"/Work/Projects/",
   "data_dir": os.path.expanduser("~")+"/Work/Datasets/MNIST/",
   "base_version": "0",
@@ -84,7 +84,7 @@ model_schedule = [
   "base_sup_mult": 1.0,
   "fb_mult": 0.0,
   "num_steps": 30,
-  "weight_lr": [0.0, 0.1, 0.1]*3,
+  "weight_lr": [0.0, 0.1, 0.1],
   "decay_steps": [50000]*3,
   "decay_rate": [0.8]*3,
   "staircase": [True]*3,
