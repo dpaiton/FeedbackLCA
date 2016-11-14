@@ -13,7 +13,7 @@ Modifiable Parameters:
                        Can be "Model", "LCAF" or "DRSAE"
   model_name     [str] Name for model
   output_dir     [str] Base directory where output will be directed
-  base_version   [str] Unmodified base version for output
+  version        [str] Model version for output
   optimizer      [str] Which optimization algorithm to use
                        Can be "annealed_sgd" or "adam"
   auto_diff_u    [bool] LCAF - If set, use auto-differentiation for u update
@@ -65,9 +65,9 @@ class Model(object):
     self.load_schedule(schedule)
     self.sched_idx = 0
     self.load_params(params)
+    # TODO: tf.set_random_seed() is graph specific, so it may not work here?
     if self.rand_seed is not None:
       tf.set_random_seed(self.rand_seed)
-      np.random.seed(self.rand_seed)
     self.init_logging()
     self.make_dirs()
     self.build_graph()
@@ -104,11 +104,7 @@ class Model(object):
       self.num_labeled = str(params["num_labeled"])
     if "num_unlabeled" in params.keys():
       self.num_unlabeled = str(params["num_unlabeled"])
-    self.base_version = str(params["base_version"])
-    if "version" in params.keys():
-      self.version = str(params["version"])
-    else:
-      self.version = str(params["base_version"])
+    self.version = str(params["version"])
     self.optimizer = str(params["optimizer"])
     if "rectify_a" in params.keys():
       self.rectify_a = bool(params["rectify_a"])
@@ -507,11 +503,9 @@ class Model(object):
     if hasattr(self, "pSNRdB"):
       logging.info("\trecon pSNR dB:\t\t%g"%(self.pSNRdB.eval(feed_dict)))
     if hasattr(self, "accuracy"):
-      train_acc = self.accuracy.eval(feed_dict)
-      if train_acc >= 0:
-        logging.info("\ttrain accuracy:\t\t%g"%(self.accuracy.eval(feed_dict)))
-        logging.info("\tnum labeled data:\t%g"%(
-          self.num_labeled_ex.eval(feed_dict)))
+      logging.info("\ttrain accuracy:\t\t%g"%(self.accuracy.eval(feed_dict)))
+      logging.info("\tnum labeled data:\t%g"%(
+        self.num_labeled_ex.eval(feed_dict)))
 
   """
   Plot weights, reconstruction, and gradients
