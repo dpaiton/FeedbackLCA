@@ -32,6 +32,7 @@ Inputs:
       models/model_constructor.Model
     sched_idx: [int] schedule index for the model to be tested
     checkpoint: [str] location of weights_checkpoint file to be loaded
+    use_labels: [bool] indicates if supervised labels should be used
   data: dataset to be run on, should be indexed from data/input_data.load_MNIST
     e.g. data = load_MNIST(...)["train"]
 
@@ -63,14 +64,21 @@ def compute_inference(args, data):
     args["num_inference_steps"], args["model_params"]["num_pixels"]))
   images = [None]*args["num_inference_images"]
   with tf.Session(graph=model.graph) as tmp_sess:
-    feed_dict = model.get_feed_dict(np.expand_dims(data.images.T[:,0], axis=1),
-        np.expand_dims(data.labels.T[:,0], axis=1))
+    if args["use_labels"]:
+      feed_dict = model.get_feed_dict(np.expand_dims(data.images.T[:,0], axis=1),
+          np.expand_dims(data.labels.T[:,0], axis=1))
+    else:
+      feed_dict = model.get_feed_dict(np.expand_dims(data.images.T[:,0], axis=1),
+          np.expand_dims(data.ignore_labels.T[:,0], axis=1))
     tmp_sess.run(model.init_op, feed_dict)
     model.weight_saver.restore(tmp_sess, args["checkpoint"])
     threshold = tmp_sess.run(model.sparse_mult, feed_dict)
     for img_idx in range(args["num_inference_images"]):
-      image = data.next_batch(1)[0].T
-      label = data.next_batch(1)[1].T
+      image = data.images[img_idx, None, :].T
+      if args["use_labels"]:
+        label = data.labels[img_idx, None, :].T
+      else:
+        label = data.ignore_labels[img_idx, None, :].T
       images[img_idx] = image
       feed_dict = model.get_feed_dict(image, label)
       tmp_sess.run(model.clear_u, feed_dict)
@@ -117,7 +125,6 @@ Inputs:
     checkpoint: [str] location of weights_checkpoint file to be loaded
   data: dataset to be run on, should be indexed from data/input_data.load_MNIST
     e.g. data = load_MNIST(...)["train"]
-
 """
 def evaluate_model(args, data):
   images = data.images.T
@@ -140,7 +147,16 @@ def evaluate_model(args, data):
     s_ = tmp_sess.run(model.s_, feed_dict)
     y_ = tmp_sess.run(model.y_, feed_dict)
     pSNRdB = tmp_sess.run(model.pSNRdB, feed_dict)
-  return {"a":a, "phi":phi, "w":w, "s_":s_, "y_":y_, "pSNRdB":pSNRdB}
+  averages = np.zeros_like(phi)
+  max_activities = np.max(a, axis=1)
+  for img_idx in range(num_imgs):
+    for neuron_idx in range(a.shape[0]):
+      if a[neuron_idx, img_idx] > 0:
+        weight = a[neuron_idx, img_idx] / max_activities[neuron_idx]
+        averages[neuron_idx, :] += weight * images[:,img_idx]
+  averages /= num_imgs
+  return {"a":a, "phi":phi, "w":w, "s_":s_, "y_":y_, "pSNRdB":pSNRdB,
+    "atas":averages}
 
 """
 Compute model performance on an MNIST dataset
@@ -155,7 +171,7 @@ Inputs:
     model_params: data structure specifying params, as expected by
       input/input_data.load_MNIST and models/model_constructor.Model
     model_schedule: data structure specifying schedule, as expected by
-      models/model_constructor.Model
+      models/model_constructor.
     sched_idx: [int] schedule index for the model to be tested
     plot_sem: [bool] if set, plot error bars for the standard error of the mean
     checkpoint: [str] location of weights_checkpoint file to be loaded
@@ -192,7 +208,7 @@ def compute_performance(args, data):
         label_set = labels
       feed_dict = model.get_feed_dict(image_set, label_set)
       if model.model_type == "LCAF":
-        feed_dict[model.fb_mult] = 0.0
+        feed_dict[model.sup_mult] = 0.0
         tmp_sess.run(model.clear_u, feed_dict)
         for _ in range(model.get_sched("num_steps")):
           tmp_sess.run(model.step_lca, feed_dict)
@@ -242,18 +258,18 @@ def main(args):
 
   mnist_data = load_MNIST(args["params"][0]["data_dir"],
     num_val=10000,
-    fraction_labels=1.0,
+    fraction_labels=0.0,
     normalize_imgs=True,
     one_hot=args["params"][0]["one_hot_labels"],
-    rand_seed=args["params"][0]["rand_seed"])
+    rand_state=args["params"][0]["rand_state"])
 
+  ## TODO: No longer running multiple conditions, should clean this up
   ## Analysis per condition (frac labeled examples)
   loss = [None] * num_conditions
   recon = [None] * num_conditions
   for condition_idx in range(num_conditions):
     print("Computing performance evaluations for run %g out of %g"%(
       condition_idx+1, num_conditions))
-
     params = args["params"][condition_idx]
     sched = args["schedule"][condition_idx]
     loss[condition_idx] = args["loss"][condition_idx]
@@ -273,10 +289,12 @@ def main(args):
     ## Compute test & val performance for trained model
     chk_args = dict()
     sched_idx = len(sched)-1
-    #TODO: allow user to specify batch_idx if they want to
-    batch_idx = 0
-    for schedule in sched:
-      batch_idx += schedule["num_batches"]
+    if args["batch_idx"] > 0:
+      batch_idx = args["batch_idx"]
+    else:
+      batch_idx = 0
+      for schedule in sched:
+        batch_idx += schedule["num_batches"]
     args["checkpoint"] = (args["checkpoint_dir"]+params["model_name"]
       +"_v"+params["version"]+"_full-"
       +str(batch_idx))
@@ -293,10 +311,16 @@ def main(args):
 
     ## Plot inference for a single display period
     if args["inference"] and params["model_type"] == "LCAF":
-      inference_data = compute_inference(args, mnist_data["train"])
-      pf.save_inference_stats(inference_data, base_filename, args["file_ext"],
-        num_skip=10)
-      pf.save_inference_traces(inference_data, base_filename, args["file_ext"])
+      label_txt = ["supervised", "unsupervised"]
+      for idx, labels_bool in enumerate([True, False]):
+        args["use_labels"] = labels_bool
+        inference_data = compute_inference(args, mnist_data["train"])
+        pf.save_inference_stats(inference_data,
+          base_filename+"_"+label_txt[idx], args["file_ext"], num_skip=10)
+        pf.save_inference_traces(inference_data,
+          base_filename+"_"+label_txt[idx], args["file_ext"])
+        pf.save_inference_activity(inference_data,
+          base_filename+"_"+label_txt[idx], args["file_ext"])
 
     if args["eval_train"]:
       ## Evaluate model on dataset for future analysis
@@ -318,9 +342,54 @@ def main(args):
           int(np.sqrt(params["num_pixels"]))))
         title = "Top & Bottom phi Elements for Digit "+str(c)
         out_filename = base_filename+"_top_phi_"+str(c)+args["file_ext"]
-        normalize = True
-        pf.save_data_tiled(data, normalize, title, out_filename, vmin=-1.0,
-          vmax=1.0)
+        pf.save_data_tiled(data, normalize=True, title=title,
+          save_filename=out_filename, vmin=-1.0, vmax=1.0)
+
+      ## Visualization of dictionary sorted by associated dataset activity
+      sorted_act_idx = np.argsort(np.sum(train["a"] != 0, axis=1))[::-1]
+      weights_sorted = train["phi"][sorted_act_idx, :].reshape(
+        train["phi"].shape[0], int(np.sqrt(train["phi"].shape[1])),
+        int(np.sqrt(train["phi"].shape[1])))
+      weight_out_filename = (base_filename+"_sorted_weights"+args["file_ext"])
+      fig_title = "Phi sorted by activation frequency in training set"
+      pf.save_data_tiled(weights_sorted, normalize=True, title=fig_title,
+        save_filename=weight_out_filename, vmin=-1.0, vmax=1.0)
+
+      ## Activity triggered averages
+      img_shape = mnist_data["train"].images.shape
+      lbl_shape = mnist_data["train"].labels.shape
+      atas_out_filename = (base_filename+"_act_trig_avg_imgs"+args["file_ext"])
+      fig_title = "Activity triggered averages on training data"
+      atas = train["atas"].reshape(train["atas"].shape[0], int(np.sqrt(
+        train["atas"].shape[1])), int(np.sqrt(train["atas"].shape[1])))
+      pf.save_data_tiled(atas, normalize=True, title=fig_title,
+        save_filename=atas_out_filename, vmin=-1.0, vmax=1.0)
+      noise_images = np.random.randn(img_shape[0], img_shape[1])
+      noise_labels = np.zeros(lbl_shape)
+      noise_data = type('', (), {})() # empty object
+      noise_data.images = noise_images
+      noise_data.labels = noise_labels
+      noise = evaluate_model(args, noise_data)
+      atas_out_filename = (base_filename+"_act_trig_avg_noise"+args["file_ext"])
+      fig_title = "Activity triggered averages on noise data"
+      atas = noise["atas"].reshape(noise["atas"].shape[0], int(np.sqrt(
+        noise["atas"].shape[1])), int(np.sqrt(noise["atas"].shape[1])))
+      pf.save_data_tiled(atas, normalize=True, title=fig_title,
+        save_filename=atas_out_filename, vmin=-1.0, vmax=1.0)
+      spot_images = np.zeros((img_shape[1], img_shape[1]))
+      for idx in range(img_shape[1]):
+        spot_images[idx, idx] = 1
+      spot_labels = np.zeros((spot_images.shape[0], 10))
+      spot_data = type('', (), {})() # empty object
+      spot_data.images = spot_images
+      spot_data.labels = spot_labels
+      spot = evaluate_model(args, spot_data)
+      atas_out_filename = (base_filename+"_act_trig_avg_spots"+args["file_ext"])
+      fig_title = "Activity triggered averages on spot data"
+      atas = spot["atas"].reshape(spot["atas"].shape[0], int(np.sqrt(
+        spot["atas"].shape[1])), int(np.sqrt(spot["atas"].shape[1])))
+      pf.save_data_tiled(atas, normalize=True, title=fig_title,
+        save_filename=atas_out_filename, vmin=-1.0, vmax=1.0)
 
       ## Frequency of activation per element across dataset
       perc_used = (100.0 * np.sort(np.sum(train["a"] != 0, axis=1))[::-1]
@@ -348,17 +417,6 @@ def main(args):
         out_filename=act_out_filename, xlabel=xlabel, ylabel=ylabel,
         title=title)
 
-      ## Visualization of dictionary sorted by associated dataset activity
-      sorted_act_idx = np.argsort(np.sum(train["a"] != 0, axis=1))[::-1]
-      weights_sorted = train["phi"][sorted_act_idx, :].reshape(
-        train["phi"].shape[0], int(np.sqrt(train["phi"].shape[1])),
-        int(np.sqrt(train["phi"].shape[1])))
-      weight_out_filename = (base_filename+"_sorted_weights"+args["file_ext"])
-      fig_title = "Phi sorted by activation frequency in training set"
-      normalize = True
-      pf.save_data_tiled(weights_sorted, normalize, fig_title,
-        weight_out_filename, vmin=-1.0, vmax=1.0)
-
       ## Compute entropy of class predictions across dataset
       ent = -np.sum(train["y_"] * np.log(train["y_"]+1e-16), axis=0)
       print(("\tThe mean entropy of y_ on the train set was %g with STD %g.")%(
@@ -367,7 +425,7 @@ def main(args):
       ## Mean sparsity across the training set
       mean_sparsity = (100 * np.mean([np.count_nonzero(train["a"][:,idx])
         for idx in range(train["a"].shape[1])]) / float(train["a"].shape[0]))
-      print(("\tThe mean number of active nodes on the train set was %0.2f%%")%(
+      print(("\tThe mean percentage of active nodes on the train set was %0.2f%%")%(
        mean_sparsity))
 
       ## Mean reconstruction quality across the training set
@@ -378,7 +436,7 @@ def main(args):
   ## Compute average error rate on Val & Test sets
   if args["run_test"] or args["run_val"]:
     base_filename = (args["analysis_dir"]+params["model_name"]+"_v"
-      +params["base_version"])
+      +params["version"])
     num_samples = [params["num_labeled"] for params in args["params"]]
     error_rates = []
     error_str = []
@@ -389,8 +447,10 @@ def main(args):
           +args["file_ext"])
       else:
         test_out_filename = (base_filename+"_performance"+args["file_ext"])
-      test_fig = pf.save_performance(test_performance, num_samples,
-        test_out_filename, "test", args["plot_sem"])
+      #TODO: This figure should be redone since I don't do multiple conditions
+      #      per logfile now.
+      #test_fig = pf.save_performance(test_performance, num_samples,
+      #  test_out_filename, "test", args["plot_sem"])
       error_rates.append([num_test * (1 - test_performance[idx][0][0])
         for idx in np.arange(len(test_performance))])
       error_str.append("test")
@@ -401,8 +461,8 @@ def main(args):
         val_out_filename = base_filename+"_performance_sem"+args["file_ext"]
       else:
         val_out_filename = base_filename+"_performance"+args["file_ext"]
-      val_fig = pf.save_performance(val_performance, num_samples,
-        val_out_filename, "val", args["plot_sem"])
+      #val_fig = pf.save_performance(val_performance, num_samples,
+      #  val_out_filename, "val", args["plot_sem"])
       error_rates.append([num_val * (1-val_performance[idx][0][0])
         for idx in np.arange(len(val_performance))])
       error_str.append("val")
@@ -417,43 +477,42 @@ def main(args):
         +"Recon Quality\n%s")%(error_str[err_idx], out_str))
       print("-".join(["" for _ in range(75)]))
 
-  ## Final outputs
-  print("Analysis complete for version "+str(params["base_version"])+"\n")
-
 if __name__ == "__main__":
   args = dict()
 
   ## TODO: recon quality doesnt match mean reconstruction
   ##       also, verify units for mean recon
 
-  #versions = [str(val) for val in range(0,8)]
-  versions = ["0"]
+  versions = ["0.0", "0.1", "0.2"]
 
   #args["model_name"] = "test"
   #args["model_name"] = "pretrain"
+  #args["model_name"] = "pretrain_dlca"
+  #args["model_name"] = "dlca"
+  #args["model_name"] = "dlca_xent"
+  args["model_name"] = "dlca_ent"
   #args["model_name"] = "mlp"
   #args["model_name"] = "mlp_rand"
   #args["model_name"] = "mlp_pretrain_learn"
   #args["model_name"] = "mlp_pretrain_nolearn"
   #args["model_name"] = "mlp_norm"
   #args["model_name"] = "mlp_nonorm"
-  #args["model_name"] = "dlca"
   #args["model_name"] = "dlcaf_ent"
   #args["model_name"] = "dlca_pretrain"
   #args["model_name"] = "dlcaf_ent_pretrain"
-  args["model_name"] = "dlcaf_ent_pretrain_dlca"
+  #args["model_name"] = "dlcaf_ent_pretrain_dlca"
 
-  #args["batch_idx"] = 10000 #TODO: Specify which checkpoint to load
+  args["batch_idx"] = -1
 
   args["eval_train"] = True # Evaluate model stats on training set
   args["plot_sem"] = False # Plot SEM bars when able
-  args["run_test"] = False # Evaluate model accuracy on test set
+  args["run_test"] = True # Evaluate model accuracy on test set
   args["run_val"] = True # Evaluate model accuracy on validation set
   args["inference"] = True # Evaluate LCA inference
 
   args["num_phi"] = 8 # How many phi to view for a given w connection
   args["num_inference_images"] = 5 # How many images in average
-  args["num_inference_steps"] = 20 # How many time steps in inference
+  args["num_inference_steps"] = 30 # How many time steps in inference
 
   args["file_ext"] = ".pdf" # Output file format
   args["device"] = "/cpu:0" # Device for analysis runs
@@ -483,7 +542,8 @@ if __name__ == "__main__":
       +args["params"][0]["model_name"]+"/checkpoints/")
 
     tf.set_random_seed(args["params"][0]["rand_seed"])
-    np.random.seed(args["params"][0]["rand_seed"])
     random.seed(args["params"][0]["rand_seed"])
+    args["params"][0]["rand_state"] = np.random.RandomState(
+      args["params"][0]["rand_seed"])
 
     main(args)
