@@ -13,7 +13,7 @@ class MNIST:
     num_val=10000,
     fraction_labels=1.0,
     one_hot=True,
-    rand_seed=None):
+    rand_state=np.random.RandomState()):
 
     if num_val < 1:
       num_val = 0
@@ -38,7 +38,7 @@ class MNIST:
     if tot_imgs < num_val:
       num_val = tot_imgs
     if num_val > 0:
-      self.val_indices = np.random.choice(np.arange(tot_imgs, dtype=np.int32),
+      self.val_indices = rand_state.choice(np.arange(tot_imgs, dtype=np.int32),
         size=num_val, replace=False)
       self.img_indices = np.setdiff1d(np.arange(tot_imgs, dtype=np.int32),
         self.val_indices).astype(np.int32)
@@ -57,7 +57,7 @@ class MNIST:
           for idx
           in np.arange(len(self.img_indices), dtype=np.int32)
           if self.labels[self.img_indices[idx]] == lbl]
-        ignore_idx_list.extend(np.random.choice(lbl_loc,
+        ignore_idx_list.extend(rand_state.choice(lbl_loc,
           size=int(len(lbl_loc) - (self.num_keep/float(self.num_classes))),
           replace=False).tolist())
       self.ignore_indices = np.array(ignore_idx_list, dtype=np.int32)
@@ -106,7 +106,7 @@ class vanHateren:
   def __init__(self,
     img_dir,
     patch_edge_size=None,
-    rand_seed=None):
+    rand_state=np.random.RandomState()):
     self.images = self.extract_images(img_dir, patch_edge_size)
 
   """
@@ -132,7 +132,8 @@ class vanHateren:
     return data
 
 class dataset:
-  def __init__(self, imgs, lbls, ignore_lbls, normalize=False):
+  def __init__(self, imgs, lbls, ignore_lbls, normalize=False,
+    rand_state=np.random.RandomState()):
     num_ex = imgs.shape[0]
     num_rows = imgs.shape[1]
     num_cols = imgs.shape[2]
@@ -148,7 +149,8 @@ class dataset:
     self.epochs_completed = 0
     self.batches_completed = 0
     self.curr_epoch_idx = 0
-    self.epoch_order = np.random.permutation(self.num_examples)
+    self.epoch_order = rand_state.permutation(self.num_examples)
+    self.rand_state = rand_state
 
   """
   Advance epoch counter & generate new index order
@@ -158,7 +160,7 @@ class dataset:
   def new_epoch(self, num_to_advance=1):
     self.epochs_completed += int(num_to_advance)
     for _ in range(int(num_to_advance)):
-      self.epoch_order = np.random.permutation(self.num_examples)
+      self.epoch_order = self.rand_state.permutation(self.num_examples)
 
   """
   Return a batch of images
@@ -227,7 +229,7 @@ def load_MNIST(
   fraction_labels=1.0,
   normalize_imgs=False,
   one_hot=True,
-  rand_seed=None):
+  rand_state=np.random.RandomState()):
 
   ## Training set
   train_img_filename = data_dir+"/train-images-idx3-ubyte.gz"
@@ -238,7 +240,7 @@ def load_MNIST(
     num_val=num_val,
     fraction_labels=fraction_labels,
     one_hot=one_hot,
-    rand_seed=rand_seed)
+    rand_state=rand_state)
   train_imgs = train_val.images[train_val.img_indices, ...]
   if one_hot:
     train_lbls = train_val.labels_1h[train_val.img_indices, ...]
@@ -251,7 +253,7 @@ def load_MNIST(
     if train_val.ignore_indices is not None:
       train_ignore_lbls[train_val.ignore_indices] = -1
   train = dataset(train_imgs, train_lbls, train_ignore_lbls,
-    normalize=normalize_imgs)
+    normalize=normalize_imgs, rand_state=rand_state)
 
   ## Validation set
   if num_val > 0:
@@ -262,7 +264,7 @@ def load_MNIST(
       val_lbls = train_val.labels[train_val.val_indices]
     val_ignore_lbls = val_lbls.copy()
     val = dataset(val_imgs, val_lbls, val_ignore_lbls,
-      normalize=normalize_imgs)
+      normalize=normalize_imgs, rand_state=rand_state)
   else:
     val = None
 
@@ -275,7 +277,7 @@ def load_MNIST(
     num_val=0,
     fraction_labels=1.0,
     one_hot=one_hot,
-    rand_seed=rand_seed)
+    rand_state=rand_state)
   test_imgs = test.images
   if one_hot:
     test_lbls = test.labels_1h
@@ -283,7 +285,7 @@ def load_MNIST(
     test_lbls = test.labels
   test_ignore_lbls = test_lbls.copy()
   test = dataset(test_imgs, test_lbls, test_ignore_lbls,
-    normalize=normalize_imgs)
+    normalize=normalize_imgs, rand_state=rand_state)
 
   return {"train":train, "val":val, "test":test}
 
@@ -292,14 +294,15 @@ def load_vanHateren(
   normalize_imgs=False,
   whiten_imgs=True,
   patch_edge_size=None,
-  rand_seed=None):
+  rand_state=np.random.RandomState()):
 
   ## Training set
   img_filename = data_dir+os.sep+"images_curated.h5"
   vh_data = vanHateren(
     img_filename,
     patch_edge_size,
-    rand_seed=rand_seed)
-  images = dataset(vh_data.images, None, None, normalize=normalize_imgs)
+    rand_state=rand_state)
+  images = dataset(vh_data.images, None, None, normalize=normalize_imgs,
+    rand_state=rand_state)
   setattr(images, "num_patches", vh_data.num_patches)
   return {"train":images}
