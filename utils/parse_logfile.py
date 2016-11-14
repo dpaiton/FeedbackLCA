@@ -27,8 +27,6 @@ def read_params(log_text):
     re.findall("output_dir\s+([\w\/]+)", log_text))
   data_dir = (
     re.findall("data_dir\s+([\w\/]+)", log_text))
-  base_version = (
-    re.findall("base_version\s+(\d+.?\d*)", log_text))
   version = (
     re.findall("[^_]version\s+([\d.?]+)", log_text))
   optimizer = (
@@ -94,7 +92,6 @@ def read_params(log_text):
     "model_type": model_type if len(model_type)>1 else model_type[0],
     "output_dir": output_dir if len(output_dir)>1 else output_dir[0],
     "data_dir": data_dir if len(data_dir)>1 else data_dir[0],
-    "base_version": base_version if len(base_version)>1 else base_version[0],
     "version": version if len(version)>1 else version[0],
     "optimizer": optimizer if len(optimizer)>1 else optimizer[0],
     "auto_diff_u": auto_diff_u if len(auto_diff_u)>1 else auto_diff_u[0],
@@ -142,8 +139,6 @@ def read_schedule(log_text):
     for val in re.findall("sparse_mult\s+(\d+\.?\d*)", log_text)]
   ent_mult = [float(val)
     for val in re.findall("ent_mult\s+(\d+\.?\d*)", log_text)]
-  base_sup_mult = [float(val)
-    for val in re.findall("base_sup_mult\s+(\d+\.?\d*)", log_text)]
   sup_mult = [float(val) for val in re.findall("[^_]sup_mult\s+(\d+\.?\d*)",
     log_text)]
   num_steps = [int(val) for val in re.findall("num_steps\s+(\d+)", log_text)]
@@ -169,7 +164,6 @@ def read_schedule(log_text):
       "weights": weights[idx],
       "sparse_mult": sparse_mult[idx],
       "recon_mult": recon_mult[idx],
-      "base_sup_mult": base_sup_mult[idx],
       "sup_mult": sup_mult[idx],
       "ent_mult": ent_mult[idx],
       "num_steps": num_steps[idx],
@@ -198,7 +192,7 @@ def read_loss(log_text):
     for val in re.findall("recon pSNR dB:\s+(\-?\d+\.?\d*)", log_text)])
   recon_loss = np.array(
     [float(val)
-    for val in re.findall("recon loss:\s+(\d+\.?\d*)", log_text)])
+    for val in re.findall("reconstruction loss:\s+(\d+\.?\d*)", log_text)])
   sparse_loss = np.array(
     [float(val) for val in re.findall("sparse loss:\s+(\d+\.?\d*)", log_text)])
   unsupervised_loss = np.array(
@@ -209,7 +203,7 @@ def read_loss(log_text):
     for val in re.findall("[^un]supervised loss:\s+(\d+?\.?\d*)", log_text)])
   train_accuracy = np.array(
     [float(val)
-    for val in re.findall("train accuracy:\s+(\d+\.?\d*)", log_text)])
+    for val in re.findall("train accuracy:\s+\-?(\d+\.?\d*)", log_text)])
   val_accuracy = np.array(
     [float(val)
     for val in re.findall("validation accuracy:\s+(\d+\.?\d*)", log_text)])
