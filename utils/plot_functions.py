@@ -116,7 +116,7 @@ def save_inference_traces(data, base_filename, file_ext, img_idx=0):
         linestyle=":", dashes=(1,1), label="threshold")
       if (a[-1] > 0):
         for spine in axis.spines.values():
-          spine.set_edgecolor('magenta')
+          spine.set_edgecolor("magenta")
       max_val = np.max(np.abs([b, ga, fb, u, a]))
       scale_ratio = max_val / global_max_val
       transFigure = fig.transFigure.inverted()
@@ -127,7 +127,7 @@ def save_inference_traces(data, base_filename, file_ext, img_idx=0):
       coord1 = [axis_origin[0] - x_offset, axis_origin[1]]
       coord2 = [coord1[0], coord1[1] + line_length]
       line = matplotlib.lines.Line2D((coord1[0], coord2[0]), (coord1[1],
-        coord2[1]), transform=fig.transFigure, color='0.3')
+        coord2[1]), transform=fig.transFigure, color="0.3")
       fig.lines.append(line)
     axis.tick_params(
       axis="both",
@@ -295,6 +295,45 @@ def save_inference_stats(data, base_filename, file_ext, num_skip=1):
       title=title, save_filename=out_filename, vmin=0.0, vmax=1.0)
 
 """
+  Bar plot of activity levels per neuron for a specific inference image
+"""
+def save_inference_activity(data, base_filename, file_ext, img_idx=0):
+  (num_images, num_timesteps, num_neurons) = data["b"].shape
+  sqrt_nn = int(np.sqrt(num_neurons))
+  a = data["a"][img_idx,-1,:]
+  perc_act = 100 * np.count_nonzero(a) / a.size
+  psnr = data["psnr"][img_idx,-1]
+  recon = data["recon"][img_idx,-1,:]
+  num_px = recon.size
+  recon = recon.reshape(int(np.sqrt(num_px)), int(np.sqrt(num_px)))
+  fig, sub_axes = plt.subplots(1)
+  sub_axes.set_xlim([0, num_neurons])
+  sub_axes.set_ylim([0, np.max(a)+1])
+  sub_axes.autoscale(False)
+  sub_axes.bar(np.arange(num_neurons), a, color="b", edgecolor="k",
+    width=2, zorder=1)
+  recon_img = matplotlib.offsetbox.OffsetImage(recon, cmap="Greys",
+    interpolation="nearest")
+  ab = matplotlib.offsetbox.AnnotationBbox(recon_img, [0.06, 0.93],
+    xycoords="axes fraction", boxcoords="offset points", pad=0.3)
+  sub_axes.add_artist(ab)
+  #sub_axes.imshow(recon, zorder=0, extent=[0.0, 1.0, 0.0, 1.0])
+  sub_axes.text(0.98, 0.98, "Perc active: "+str(perc_act)+"%",
+    verticalalignment="top", horizontalalignment="right",
+    transform=sub_axes.transAxes,
+    color="k", fontsize=10)
+  snr_text = "Recon pSNRdB: {:0.2f}".format(psnr)
+  sub_axes.text(0.98, 0.93, snr_text, verticalalignment="top",
+    horizontalalignment="right", transform=sub_axes.transAxes, color="k",
+    fontsize=10)
+  sub_axes.set_ylabel("Activity")
+  sub_axes.set_xlabel("Neuron Index")
+  fig.suptitle("LCA Active Neurons", y=0.99, x=0.5)
+  out_filename = (base_filename+"_lca_active_neurons"+file_ext)
+  fig.savefig(out_filename, transparent=True)
+  plt.close(fig)
+
+"""
 Generate cross-entropy, recon, and sparse loss vals
 Outputs:
   fig: [int] corresponding to the figure number
@@ -402,21 +441,24 @@ TODO: The x values for the validation plot are approximate.
       would be done in utils/parse_logfile.py
 """
 def save_accuracy(data, out_filename):
+  keep_indices = np.where(data["train_accuracy"] != -1)
+  batch_indices = data["batch_index"][keep_indices]
+  train_acc = data["train_accuracy"][keep_indices]
   fig, sub_axes = plt.subplots(2)
   ylabel_xpos = -0.1
   axis_image = [None]*4
-  axis_image[0] = sub_axes[0].scatter(data["batch_index"],
-    data["train_accuracy"], c="b", marker=".", s=5.0)
-  z = np.polyfit(data["batch_index"], data["train_accuracy"], deg=1)
+  axis_image[0] = sub_axes[0].scatter(batch_indices,
+    train_acc, c="b", marker=".", s=5.0)
+  z = np.polyfit(batch_indices, train_acc, deg=1)
   p = np.poly1d(z)
-  axis_image[1] = sub_axes[0].plot(data["batch_index"],
-    p(data["batch_index"]), "r--")
+  axis_image[1] = sub_axes[0].plot(batch_indices, p(batch_indices), "r--")
   sub_axes[0].set_ylabel("Train Accuracy")
   sub_axes[0].set_ylim((0, 1.0))
-  sub_axes[0].set_xlim((0, data["batch_index"][-1]))
+  sub_axes[0].set_xlim((0, batch_indices[-1]))
   sub_axes[0].yaxis.set_label_coords(ylabel_xpos, 0.5)
+  #import IPython; IPython.embed()
   if "val_accuracy" in data.keys():
-    val_xdat = np.linspace(data["batch_index"][0], data["batch_index"][-1],
+    val_xdat = np.linspace(batch_indices[0], batch_indices[-1],
       len(data["val_accuracy"]))
     axis_image[2] = sub_axes[1].scatter(val_xdat, data["val_accuracy"],
       c="b", marker=".", s=5.0)
@@ -425,7 +467,7 @@ def save_accuracy(data, out_filename):
     axis_image[3] = sub_axes[1].plot(val_xdat, p(val_xdat), "r--")
     sub_axes[1].set_xlabel("Batch Number")
     sub_axes[1].set_ylabel("Val Accuracy")
-    sub_axes[1].set_xlim((0, data["batch_index"][-1]))
+    sub_axes[1].set_xlim((0, batch_indices[-1]))
     sub_axes[1].set_ylim((0, 1.0))
     sub_axes[1].yaxis.set_label_coords(ylabel_xpos, 0.5)
   fig.suptitle("Average Accuracy per Batch", y=1.0, x=0.5)
