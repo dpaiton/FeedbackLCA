@@ -923,17 +923,12 @@ class LCAF(Model):
               + (1-self.label_mult) * self.ent_mult
               * tf.gradients(self.entropy_loss, self.a)[0])
           else:
-            self.fb = (self.sup_mult * self.fb_mult * self.label_mult
+            self.fb = self.fb_mult * (self.sup_mult * self.label_mult
             * tf.matmul(tf.transpose(self.w), tf.sub(self.y_, self.y)))
 
           self.du = self.lca_b - self.lca_explain_away - self.u - self.fb
           self.step_lca = tf.group(self.u.assign_add(self.eta * self.du),
             name="do_update_u")
-          # TODO: DO THIS instead of other thing
-          #self.u_t = tf.Variable(...)
-          #for step in range(numSteps):
-          #  u_t[step] = u_t[step-1] + self.eta * self.du
-          #self.a = thresh(u_t[-1])
           self.clear_u = tf.group(self.u.assign(self.u_zeros),
             name="do_clear_u")
 
