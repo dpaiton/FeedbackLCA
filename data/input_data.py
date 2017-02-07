@@ -122,10 +122,10 @@ class vanHateren:
       num_img_px = num_px_rows * num_px_cols
       assert np.sqrt(num_img_px) % patch_edge_size == 0, (
         "The number of image edge pixels % the patch edge size must be 0.")
-      self.num_patches = int(num_img_px / patch_edge_size**2)
-      full_img_data = np.reshape(full_img_data, (num_img, num_img_px))
-      data = np.vstack([full_img_data[idx,...].reshape(self.num_patches, patch_edge_size,
-        patch_edge_size) for idx in range(num_img)])
+      self.num_patches = int(num_img_px / patch_edge_size**2)    
+      data = np.asarray(np.split(full_img_data, num_px_cols/patch_edge_size,2)) # tile column-wise
+      data = np.asarray(np.split(data, num_px_rows/patch_edge_size,2)) #tile row-wise
+      data = np.transpose(np.reshape(np.transpose(data,(3,4,0,1,2)),(patch_edge_size,patch_edge_size,-1)),(2,0,1)) 
     else:
       data = full_img_data
       self.num_patches = 0
