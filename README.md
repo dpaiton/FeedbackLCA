@@ -1,7 +1,7 @@
 # SemiSupervisedLCA
 Modified LCA model to include feedback
 
-#NOTE:
+# NOTE:
 This code is no longer maintained.
 
 Copyright 2015 Yahoo Inc.
